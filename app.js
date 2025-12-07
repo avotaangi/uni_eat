@@ -1225,30 +1225,75 @@ const renderHome = () => {
       const currentSelectionEnd = searchInput.selectionEnd;
       
       searchTimeout = setTimeout(() => {
-        // Сохраняем фокус перед обновлением
-        const hadFocus = document.activeElement === searchInput;
+        // НЕ ТРОГАЕМ INPUT ВООБЩЕ! Обновляем только state.search и результаты
+        state.search = value;
         
-        // Используем setState, который правильно восстанавливает фокус
-        setState({ search: value });
-        
-        // Дополнительно восстанавливаем позицию курсора и фокус после обновления
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            const input = root.querySelector('[data-search-input]');
-            if (input) {
-              // Восстанавливаем фокус, если он был до обновления
-              if (hadFocus && document.activeElement !== input) {
-                input.focus();
-              }
-              // Восстанавливаем позицию курсора
-              if (document.activeElement === input) {
-                const newStart = Math.min(currentSelectionStart, value.length);
-                const newEnd = Math.min(currentSelectionEnd, value.length);
-                input.setSelectionRange(newStart, newEnd);
-              }
+        // Обновляем DOM только для результатов поиска, НЕ перерисовывая весь root
+        const mealsList = root.querySelector('.meals-list');
+        if (mealsList) {
+          const mealsToShow = getFilteredMeals();
+          const favoritesView = state.view === 'favorites';
+          const filteredMeals = favoritesView
+            ? mealsToShow.filter((m) => state.favorites.has(m.id))
+            : mealsToShow;
+          
+          // Группируем блюда по категориям
+          const categoryOrder = categories.filter(cat => cat !== 'Все');
+          const mealsByCategory = {};
+          filteredMeals.forEach((meal) => {
+            if (!mealsByCategory[meal.category]) {
+              mealsByCategory[meal.category] = [];
             }
+            mealsByCategory[meal.category].push(meal);
           });
-        });
+          const sortedCategories = categoryOrder.filter(cat => mealsByCategory[cat]);
+          
+          const categoriesContent = sortedCategories
+            .map((category) => {
+              const categoryMeals = mealsByCategory[category];
+              const categoryCards = categoryMeals
+                .map(
+                  (meal) => `
+          <div class="meal-card" data-id="${meal.id}">
+            <div class="img-wrap">
+              <img src="${encodeImagePath(meal.image)}" alt="${meal.name}">
+              <div class="fav" data-fav="${meal.id}">${icons.heart(
+                    state.favorites.has(meal.id)
+                  )}</div>
+            </div>
+            <div class="name">${preventHangingPrepositions(meal.shortName)}</div>
+            <div class="price">${formatPrice(meal.price)}</div>
+            ${(() => {
+              const cartItem = state.cart.find(item => item.mealId === meal.id && (item.option === (meal.options[0] ?? null)));
+              if (cartItem) {
+                return `
+                  <div class="qty-controls" data-meal-id="${meal.id}" data-option="${cartItem.option ?? ''}">
+                    <button class="qty-btn" data-dec="${meal.id}" data-opt="${cartItem.option ?? ''}">${icons.minus}</button>
+                    <span class="qty-value">${cartItem.qty}</span>
+                    <button class="qty-btn" data-inc="${meal.id}" data-opt="${cartItem.option ?? ''}">${icons.plus}</button>
+                  </div>
+                `;
+              }
+              return `<button class="add-btn" data-add="${meal.id}">${icons.plus}</button>`;
+            })()}
+          </div>
+        `
+                )
+                .join('');
+              
+              return `
+        <div class="category-section" data-category="${category}">
+          <h2 class="category-title">${category}</h2>
+          <div class="grid">${categoryCards}</div>
+        </div>
+      `;
+            })
+            .join('');
+          
+          mealsList.innerHTML = categoriesContent;
+        }
+        
+        // НЕ ТРОГАЕМ INPUT - он остается в фокусе и с клавиатурой!
       }, 300); // Задержка для плавности ввода
     });
     
