@@ -413,6 +413,44 @@ const loadFavoritesFromStorage = () => {
   return new Set();
 };
 
+// Функция для проверки, прошло ли 11 минут после назначенного времени
+const isOrderTimeExpired = () => {
+  const orderDate = localStorage.getItem('uni_eat_order_date');
+  const orderTime = localStorage.getItem('uni_eat_order_time');
+  
+  if (!orderDate || !orderTime) {
+    return true; // Если нет данных о заказе, считаем что заказ истек
+  }
+  
+  try {
+    // Создаем объект Date из даты и времени заказа
+    const [year, month, day] = orderDate.split('-').map(Number);
+    const [hours, minutes] = orderTime.split(':').map(Number);
+    const orderDateTime = new Date(year, month - 1, day, hours, minutes);
+    
+    // Добавляем 11 минут к времени заказа
+    const expirationTime = new Date(orderDateTime.getTime() + 11 * 60 * 1000);
+    
+    // Проверяем, прошло ли время
+    return new Date() > expirationTime;
+  } catch (e) {
+    console.error('Ошибка проверки времени заказа:', e);
+    return true;
+  }
+};
+
+// Функция для проверки, есть ли активный заказ
+const hasActiveOrder = () => {
+  const orderDate = localStorage.getItem('uni_eat_order_date');
+  const orderTime = localStorage.getItem('uni_eat_order_time');
+  
+  if (!orderDate || !orderTime) {
+    return false;
+  }
+  
+  return !isOrderTimeExpired();
+};
+
 let state = {
   view: 'home', // home | detail | cart | favorites | booking
   activeCategory: categories[0],
@@ -494,149 +532,26 @@ const icons = {
 
 const formatPrice = (value) => `${value} ₽`;
 
-// Функция для проверки, прошло ли 11 минут после назначенного времени
-const isOrderTimeExpired = () => {
-  const orderDate = localStorage.getItem('uni_eat_order_date');
-  const orderTime = localStorage.getItem('uni_eat_order_time');
-  
-  if (!orderDate || !orderTime) {
-    return true; // Если нет данных о заказе, считаем что заказ истек
-  }
-  
-  try {
-    // Создаем объект Date из даты и времени заказа
-    const [year, month, day] = orderDate.split('-').map(Number);
-    const [hours, minutes] = orderTime.split(':').map(Number);
-    const orderDateTime = new Date(year, month - 1, day, hours, minutes);
-    
-    // Добавляем 11 минут к времени заказа
-    const expirationTime = new Date(orderDateTime.getTime() + 11 * 60 * 1000);
-    
-    // Проверяем, прошло ли время
-    return new Date() > expirationTime;
-  } catch (e) {
-    console.error('Ошибка проверки времени заказа:', e);
-    return true;
-  }
-};
-
-// Функция для проверки, есть ли активный заказ
-const hasActiveOrder = () => {
-  const orderDate = localStorage.getItem('uni_eat_order_date');
-  const orderTime = localStorage.getItem('uni_eat_order_time');
-  
-  if (!orderDate || !orderTime) {
-    return false;
-  }
-  
-  return !isOrderTimeExpired();
-};
-
 // Функция для предотвращения висячих предлогов
-// Функции для работы с изображениями в localStorage
-const imageCachePrefix = 'uni_eat_image_';
-
-// Конвертация изображения в base64
-const imageToBase64 = (url) => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      try {
-        const base64 = canvas.toDataURL('image/png');
-        resolve(base64);
-      } catch (e) {
-        reject(e);
-      }
-    };
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.src = url;
-  });
-};
-
-// Сохранение изображения в localStorage
-const saveImageToStorage = (path, base64) => {
-  try {
-    const key = imageCachePrefix + encodeURIComponent(path);
-    localStorage.setItem(key, base64);
-  } catch (e) {
-    console.error('Ошибка сохранения изображения в localStorage:', e);
-    // Если превышен лимит, удаляем старые изображения
-    if (e.name === 'QuotaExceededError') {
-      clearOldImages();
-      try {
-        const key = imageCachePrefix + encodeURIComponent(path);
-        localStorage.setItem(key, base64);
-      } catch (e2) {
-        console.error('Не удалось сохранить изображение после очистки:', e2);
-      }
-    }
-  }
-};
-
-// Загрузка изображения из localStorage
-const loadImageFromStorage = (path) => {
-  try {
-    const key = imageCachePrefix + encodeURIComponent(path);
-    return localStorage.getItem(key);
-  } catch (e) {
-    console.error('Ошибка загрузки изображения из localStorage:', e);
-    return null;
-  }
-};
-
-// Очистка старых изображений (удаляет первые 5)
-const clearOldImages = () => {
-  try {
-    const keys = Object.keys(localStorage).filter(key => key.startsWith(imageCachePrefix));
-    if (keys.length > 0) {
-      keys.slice(0, 5).forEach(key => localStorage.removeItem(key));
-    }
-  } catch (e) {
-    console.error('Ошибка очистки старых изображений:', e);
-  }
-};
-
-// Загрузка всех изображений и сохранение в localStorage
-const preloadImages = async () => {
-  const uniqueImages = [...new Set(meals.map(meal => meal.image))];
-  const promises = uniqueImages.map(async (path) => {
-    // Проверяем, есть ли уже в localStorage
-    if (loadImageFromStorage(path)) {
-      return;
-    }
-    try {
-      const encodedPath = encodeImagePath(path);
-      const base64 = await imageToBase64(encodedPath);
-      saveImageToStorage(path, base64);
-    } catch (e) {
-      console.error(`Ошибка загрузки изображения ${path}:`, e);
-    }
-  });
-  await Promise.all(promises);
-};
-
 // Функция для правильного кодирования путей к изображениям
 const encodeImagePath = (path) => {
   if (!path) return path;
   
-  // Сначала проверяем localStorage
-  const cached = loadImageFromStorage(path);
-  if (cached) {
-    return cached;
-  }
-  
-  // Если нет в кеше, используем оригинальный путь
+  // Разбиваем путь на части
   const parts = path.split('/');
   if (parts.length < 2) return path;
-  const dir = parts[0];
-  const filename = parts.slice(1).join('/');
-  return dir + '/' + encodeURIComponent(filename).replace(/%2F/g, '/');
+  
+  // Кодируем каждую часть пути отдельно, кроме первой (директория)
+  const encodedParts = parts.map((part, index) => {
+    if (index === 0) {
+      // Первая часть (директория) остается без изменений
+      return part;
+    }
+    // Остальные части кодируем, чтобы правильно обработать кириллицу
+    return encodeURIComponent(part);
+  });
+  
+  return encodedParts.join('/');
 };
 
 const preventHangingPrepositions = (text) => {
@@ -687,21 +602,27 @@ const setState = (patch) => {
   
   // Восстанавливаем фокус и позицию курсора
   if (hadFocus) {
+    // Используем двойной requestAnimationFrame для более надежного восстановления фокуса
     requestAnimationFrame(() => {
-      const newSearchInput = root.querySelector('[data-search-input]');
-      if (newSearchInput) {
-        // Восстанавливаем значение из input, если оно было изменено
-        if (inputValue !== null && newSearchInput.value !== inputValue) {
-          newSearchInput.value = inputValue;
+      requestAnimationFrame(() => {
+        const newSearchInput = root.querySelector('[data-search-input]');
+        if (newSearchInput) {
+          // Восстанавливаем значение из input, если оно было изменено
+          if (inputValue !== null && newSearchInput.value !== inputValue) {
+            newSearchInput.value = inputValue;
+          }
+          // Фокусируемся только если input все еще должен быть в фокусе
+          if (document.activeElement !== newSearchInput) {
+            newSearchInput.focus();
+          }
+          if (selectionStart !== null && selectionEnd !== null) {
+            // Восстанавливаем позицию курсора
+            const newSelectionStart = Math.min(selectionStart, inputValue ? inputValue.length : 0);
+            const newSelectionEnd = Math.min(selectionEnd, inputValue ? inputValue.length : 0);
+            newSearchInput.setSelectionRange(newSelectionStart, newSelectionEnd);
+          }
         }
-        newSearchInput.focus();
-        if (selectionStart !== null && selectionEnd !== null) {
-          // Увеличиваем позицию курсора, если значение изменилось
-          const newSelectionStart = Math.min(selectionStart, inputValue ? inputValue.length : 0);
-          const newSelectionEnd = Math.min(selectionEnd, inputValue ? inputValue.length : 0);
-          newSearchInput.setSelectionRange(newSelectionStart, newSelectionEnd);
-        }
-      }
+      });
     });
   }
   
@@ -945,9 +866,9 @@ const renderHome = () => {
           state.showDiningInfo
             ? `<div class="dining-info-popover">
                 <div class="dining-info-content">
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
                     <h3 style="font-size:18px; font-weight:700; color:#1c376a; margin:0;">Главная университетская столовая</h3>
-                    <button class="ghost" data-close-dining style="width:24px; height:24px; padding:0; display:flex; align-items:center; justify-content:center;">${icons.close}</button>
+                    <button class="ghost" data-close-dining style="width:24px; height:24px; padding:0; display:flex; align-items:center; justify-content:center; margin-top:0;">${icons.close}</button>
                   </div>
                   <div style="display:flex; flex-direction:column; gap:12px;">
                     <div style="display:flex; align-items:center; gap:8px; color:#4b5d86;">
@@ -1146,12 +1067,11 @@ const renderHome = () => {
 
   const searchInput = root.querySelector('[data-search-input]');
   if (searchInput) {
-    let searchTimeout = null;
     searchInput.addEventListener('input', (e) => {
       e.stopPropagation();
       const value = e.target.value;
       
-      // Обновляем значение в state сразу, но без перерисовки
+      // Обновляем значение в state сразу
       state.search = value;
       
       // Обновляем кнопку очистки поиска без перерисовки
@@ -1174,16 +1094,11 @@ const renderHome = () => {
         clearBtn.remove();
       }
       
-      // Очищаем предыдущий таймер
-      if (searchTimeout) {
-        clearTimeout(searchTimeout);
-      }
-      
-      // Обновляем результаты поиска с задержкой (debounce)
-      searchTimeout = setTimeout(() => {
-        setState({ search: value });
-      }, 300);
+      // Обновляем результаты поиска сразу, но сохраняем фокус
+      setState({ search: value });
     });
+    
+    // Предотвращаем всплытие событий, чтобы не мешать вводу
     searchInput.addEventListener('keydown', (e) => {
       e.stopPropagation();
     });
@@ -1195,6 +1110,9 @@ const renderHome = () => {
     });
     searchInput.addEventListener('click', (e) => {
       e.stopPropagation();
+    });
+    searchInput.addEventListener('blur', (e) => {
+      // Не предотвращаем blur, чтобы пользователь мог сам закрыть клавиатуру
     });
   }
 
@@ -2182,25 +2100,23 @@ const render = () => {
 };
 
 // Инициализация при загрузке
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    render();
-    // Предзагрузка изображений в фоне
-    preloadImages().then(() => {
-      // После загрузки всех изображений перерисовываем страницу
-      if (state.view === 'home' || state.view === 'detail' || state.view === 'cart' || state.view === 'favorites') {
+if (!root) {
+  console.error('Элемент #app не найден!');
+} else {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      try {
         render();
+      } catch (err) {
+        console.error('Ошибка при рендеринге:', err);
       }
     });
-  });
-} else {
-  render();
-  // Предзагрузка изображений в фоне
-  preloadImages().then(() => {
-    // После загрузки всех изображений перерисовываем страницу
-    if (state.view === 'home' || state.view === 'detail' || state.view === 'cart' || state.view === 'favorites') {
+  } else {
+    try {
       render();
+    } catch (err) {
+      console.error('Ошибка при рендеринге:', err);
     }
-  });
+  }
 }
 
