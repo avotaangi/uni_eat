@@ -290,11 +290,58 @@ const saveCartToStorage = () => {
 const clearCart = () => {
   state.cart = [];
   saveCartToStorage();
+  updateCartBadge();
   setState({ cart: [] });
 };
 
 const getCartItemsCount = () => {
   return state.cart.reduce((sum, item) => sum + item.qty, 0);
+};
+
+// Функция для динамического обновления бейджа корзины
+const updateCartBadge = () => {
+  const count = getCartItemsCount();
+  
+  // Обновляем бейдж в нижней навигации
+  const bottomNavCartBtn = root.querySelector('.bottom-nav [data-nav="cart"]');
+  if (bottomNavCartBtn) {
+    let badge = bottomNavCartBtn.querySelector('.cart-badge');
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'cart-badge';
+        // Вставляем бейдж после иконки, но перед текстом
+        const icon = bottomNavCartBtn.querySelector('svg');
+        const textSpan = bottomNavCartBtn.querySelector('span:not(.cart-badge)');
+        if (icon && textSpan) {
+          bottomNavCartBtn.insertBefore(badge, textSpan);
+        } else if (icon) {
+          icon.parentNode.insertBefore(badge, icon.nextSibling);
+        } else {
+          bottomNavCartBtn.insertBefore(badge, bottomNavCartBtn.firstChild);
+        }
+      }
+      badge.textContent = count;
+    } else if (badge) {
+      badge.remove();
+    }
+  }
+  
+  // Обновляем бейдж на странице деталей (в detail-actions)
+  const detailCartBtn = root.querySelector('.detail [data-nav="cart"]');
+  if (detailCartBtn) {
+    let badge = detailCartBtn.querySelector('.cart-badge');
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'cart-badge';
+        detailCartBtn.appendChild(badge);
+      }
+      badge.textContent = count;
+    } else if (badge) {
+      badge.remove();
+    }
+  }
 };
 
 const loadCartFromStorage = () => {
@@ -456,14 +503,19 @@ const setState = (patch) => {
   let hadFocus = false;
   let selectionStart = null;
   let selectionEnd = null;
+  let inputValue = null;
   
   if (searchInput && document.activeElement === searchInput) {
     hadFocus = true;
     selectionStart = searchInput.selectionStart;
     selectionEnd = searchInput.selectionEnd;
+    inputValue = searchInput.value;
     // Если обновляется search, берем значение из input, а не из state
-    if (patch.search === undefined && searchInput.value !== state.search) {
-      patch.search = searchInput.value;
+    if (patch.search !== undefined) {
+      // Используем значение из patch, но сохраняем актуальное значение из input
+      patch.search = inputValue;
+    } else if (searchInput.value !== state.search) {
+      patch.search = inputValue;
     }
   }
   
@@ -475,9 +527,16 @@ const setState = (patch) => {
     requestAnimationFrame(() => {
       const newSearchInput = root.querySelector('[data-search-input]');
       if (newSearchInput) {
+        // Восстанавливаем значение из input, если оно было изменено
+        if (inputValue !== null && newSearchInput.value !== inputValue) {
+          newSearchInput.value = inputValue;
+        }
         newSearchInput.focus();
         if (selectionStart !== null && selectionEnd !== null) {
-          newSearchInput.setSelectionRange(selectionStart, selectionEnd);
+          // Увеличиваем позицию курсора, если значение изменилось
+          const newSelectionStart = Math.min(selectionStart, inputValue ? inputValue.length : 0);
+          const newSelectionEnd = Math.min(selectionEnd, inputValue ? inputValue.length : 0);
+          newSearchInput.setSelectionRange(newSelectionStart, newSelectionEnd);
         }
       }
     });
@@ -612,6 +671,8 @@ const addToCart = (mealId, qty = 1, option = null) => {
   }
   state.cart = nextCart;
   saveCartToStorage();
+  // Сразу обновляем бейдж корзины
+  updateCartBadge();
   // Обновляем кнопки Telegram после изменения корзины
   requestAnimationFrame(() => {
     updateTelegramButtons();
@@ -626,6 +687,8 @@ const setCartQty = (mealId, option, qty) => {
     .filter((item) => item.qty > 0);
   state.cart = nextCart;
   saveCartToStorage();
+  // Сразу обновляем бейдж корзины
+  updateCartBadge();
   // Обновляем кнопки Telegram после изменения корзины
   requestAnimationFrame(() => {
     updateTelegramButtons();
@@ -917,15 +980,54 @@ const renderHome = () => {
 
   const searchInput = root.querySelector('[data-search-input]');
   if (searchInput) {
+    let searchTimeout = null;
     searchInput.addEventListener('input', (e) => {
       e.stopPropagation();
       const value = e.target.value;
-      setState({ search: value });
+      
+      // Обновляем значение в state сразу, но без перерисовки
+      state.search = value;
+      
+      // Обновляем кнопку очистки поиска без перерисовки
+      const clearBtn = root.querySelector('[data-clear-search]');
+      if (value && !clearBtn) {
+        const searchContainer = root.querySelector('.search');
+        if (searchContainer) {
+          searchContainer.insertAdjacentHTML('beforeend', `<button class="clear-search" data-clear-search title="Очистить">${icons.close}</button>`);
+          root.querySelector('[data-clear-search]')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const input = root.querySelector('[data-search-input]');
+            if (input) {
+              input.value = '';
+              state.search = '';
+              setState({ search: '' });
+            }
+          });
+        }
+      } else if (!value && clearBtn) {
+        clearBtn.remove();
+      }
+      
+      // Очищаем предыдущий таймер
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+      
+      // Обновляем результаты поиска с задержкой (debounce)
+      searchTimeout = setTimeout(() => {
+        setState({ search: value });
+      }, 300);
     });
     searchInput.addEventListener('keydown', (e) => {
       e.stopPropagation();
     });
     searchInput.addEventListener('keyup', (e) => {
+      e.stopPropagation();
+    });
+    searchInput.addEventListener('focus', (e) => {
+      e.stopPropagation();
+    });
+    searchInput.addEventListener('click', (e) => {
       e.stopPropagation();
     });
   }
@@ -1212,11 +1314,11 @@ const renderCart = () => {
                   ${item.option ? `<div style="color:#6a7ea6;">${item.option}</div>` : ''}
                   <div class="qty" style="margin-top:8px;">
                     <button data-dec="${item.meal.id}" data-opt="${item.option ?? ''}">${icons.minus}</button>
-                    <span>${item.qty}</span>
+                    <span class="qty-value">${item.qty}</span>
                     <button data-inc="${item.meal.id}" data-opt="${item.option ?? ''}">${icons.plus}</button>
                   </div>
                 </div>
-                <div style="font-weight:700; color:#1f4b99;">${formatPrice(
+                <div class="cart-item-price" style="font-weight:700; color:#1f4b99;" data-meal-id="${item.meal.id}" data-opt="${item.option ?? ''}">${formatPrice(
                   item.meal.price * item.qty
                 )}</div>
               </div>
@@ -1229,7 +1331,7 @@ const renderCart = () => {
     <div class="cart-footer">
       <div>
         <div style="color:#6a7ea6; font-weight:600;">Итого</div>
-        <div style="font-size:18px; font-weight:800;">${formatPrice(total)}</div>
+        <div class="total-amount" style="font-size:18px; font-weight:800;">${formatPrice(total)}</div>
       </div>
       <button class="primary-btn" style="width:auto; padding:8px 12px;" data-checkout ${
         items.length ? '' : 'disabled'
@@ -1289,10 +1391,46 @@ const renderCart = () => {
       const opt = btn.dataset.opt || null;
       const mealId = btn.dataset.inc;
       const current = state.cart.find((i) => i.mealId === mealId && (i.option ?? '') === (opt ?? ''));
-      setCartQty(mealId, opt || null, (current?.qty ?? 0) + 1);
-      // Обновляем информацию на всех страницах
+      const newQty = (current?.qty ?? 0) + 1;
+      setCartQty(mealId, opt || null, newQty);
+      
+      // Обновляем только количество в корзине без полной перерисовки
       if (state.view === 'cart') {
-        renderCart();
+        // Обновляем количество в элементе управления
+        const qtyContainer = btn.closest('.qty');
+        const qtyValue = qtyContainer?.querySelector('.qty-value');
+        if (qtyValue) {
+          qtyValue.textContent = newQty;
+        }
+        // Обновляем цену конкретного товара
+        const cartItem = btn.closest('.cart-item');
+        const priceElement = cartItem?.querySelector(`.cart-item-price[data-meal-id="${mealId}"][data-opt="${opt ?? ''}"]`);
+        if (priceElement) {
+          const meal = meals.find((m) => m.id === mealId);
+          if (meal) {
+            priceElement.textContent = formatPrice(meal.price * newQty);
+          }
+        }
+        // Обновляем общую сумму
+        const items = state.cart.map((item) => {
+          const meal = meals.find((m) => m.id === item.mealId);
+          return { ...item, meal };
+        });
+        const total = items.reduce((sum, item) => sum + (item.meal ? item.meal.price * item.qty : 0), 0);
+        const totalElement = root.querySelector('.cart-footer .total-amount');
+        if (totalElement) {
+          totalElement.textContent = formatPrice(total);
+        }
+        // Если количество стало 0, удаляем элемент из корзины
+        if (newQty === 0) {
+          if (cartItem) {
+            cartItem.remove();
+            // Если корзина пуста, перерисовываем страницу
+            if (state.cart.length === 0) {
+              renderCart();
+            }
+          }
+        }
       } else if (state.view === 'home' || state.view === 'favorites') {
         renderHome();
       } else if (state.view === 'detail') {
@@ -1307,9 +1445,44 @@ const renderCart = () => {
       const current = state.cart.find((i) => i.mealId === mealId && (i.option ?? '') === (opt ?? ''));
       const nextQty = Math.max(0, (current?.qty ?? 0) - 1);
       setCartQty(mealId, opt || null, nextQty);
-      // Обновляем информацию на всех страницах
+      
+      // Обновляем только количество в корзине без полной перерисовки
       if (state.view === 'cart') {
-        renderCart();
+        // Обновляем количество в элементе управления
+        const qtyContainer = btn.closest('.qty');
+        const qtyValue = qtyContainer?.querySelector('.qty-value');
+        if (qtyValue) {
+          qtyValue.textContent = nextQty;
+        }
+        // Обновляем цену конкретного товара
+        const cartItem = btn.closest('.cart-item');
+        const priceElement = cartItem?.querySelector(`.cart-item-price[data-meal-id="${mealId}"][data-opt="${opt ?? ''}"]`);
+        if (priceElement) {
+          const meal = meals.find((m) => m.id === mealId);
+          if (meal) {
+            priceElement.textContent = formatPrice(meal.price * nextQty);
+          }
+        }
+        // Обновляем общую сумму
+        const items = state.cart.map((item) => {
+          const meal = meals.find((m) => m.id === item.mealId);
+          return { ...item, meal };
+        });
+        const total = items.reduce((sum, item) => sum + (item.meal ? item.meal.price * item.qty : 0), 0);
+        const totalElement = root.querySelector('.cart-footer .total-amount');
+        if (totalElement) {
+          totalElement.textContent = formatPrice(total);
+        }
+        // Если количество стало 0, удаляем элемент из корзины
+        if (nextQty === 0) {
+          if (cartItem) {
+            cartItem.remove();
+            // Если корзина пуста, перерисовываем страницу
+            if (state.cart.length === 0) {
+              renderCart();
+            }
+          }
+        }
       } else if (state.view === 'home' || state.view === 'favorites') {
         renderHome();
       } else if (state.view === 'detail') {
@@ -1471,15 +1644,15 @@ const renderBooking = () => {
         
         <form id="bookingForm" style="display:flex; flex-direction:column; gap:16px;">
           <div style="display:flex; flex-direction:column; gap:16px;">
-            <div class="form-group" style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start;">
-              <div style="flex:1; min-width:150px; box-sizing:border-box;">
+            <div class="form-group" style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start; width:100%;">
+              <div style="flex:1 1 calc(50% - 6px); min-width:0; max-width:100%; box-sizing:border-box;">
                 <label style="display:block; font-weight:600; color:#1c376a; margin-bottom:8px; font-size:14px;">Дата посещения</label>
-                <input type="date" id="bookingDate" name="date" required style="width:100%; padding:12px; border:1.5px solid #dce5f7; border-radius:12px; font-size:16px; color:#1c376a; background:#fff; box-sizing:border-box;" min="${today}">
+                <input type="date" id="bookingDate" name="date" required style="width:100%; padding:12px; border:1.5px solid #dce5f7; border-radius:12px; font-size:16px; color:#1c376a; background:#fff; box-sizing:border-box; max-width:100%;" min="${today}">
               </div>
-              <div style="flex:1; min-width:150px; box-sizing:border-box;">
+              <div style="flex:1 1 calc(50% - 6px); min-width:0; max-width:100%; box-sizing:border-box;">
                 <label style="display:block; font-weight:600; color:#1c376a; margin-bottom:8px; font-size:14px;">Время посещения</label>
-                <div style="display:flex; align-items:center; gap:12px;">
-                  <input type="time" id="bookingTime" name="time" required style="flex:1; padding:12px; border:1.5px solid #dce5f7; border-radius:12px; font-size:16px; color:#1c376a; background:#fff; box-sizing:border-box; min-width:0;" value="${savedBookingData?.time || ''}">
+                <div style="display:flex; align-items:center; gap:12px; width:100%;">
+                  <input type="time" id="bookingTime" name="time" required style="flex:1; min-width:0; padding:12px; border:1.5px solid #dce5f7; border-radius:12px; font-size:16px; color:#1c376a; background:#fff; box-sizing:border-box;" value="${savedBookingData?.time || ''}">
                   <span style="font-size:12px; color:#6a7ea6; white-space:nowrap; flex-shrink:0;">± 10 минут</span>
                 </div>
               </div>
