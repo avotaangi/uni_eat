@@ -64,6 +64,7 @@ body:has(.detail) {
   box-shadow: 0 10px 40px rgba(28, 55, 106, 0.15);
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
 .top-bar {
@@ -495,6 +496,12 @@ body:has(.tabs.fixed) .category-section:first-of-type {
   justify-content: center;
   flex-wrap: wrap;
   margin: 12px 0 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0;
 }
 
 .pill {
@@ -505,6 +512,9 @@ body:has(.tabs.fixed) .category-section:first-of-type {
   color: #1f4b99;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .pill.active {
@@ -554,7 +564,7 @@ body:has(.tabs.fixed) .category-section:first-of-type {
   bottom: 16px;
   left: 16px;
   right: 16px;
-  width: calc(100vw - 32px);
+  width: calc(100% - 32px);
   max-width: calc(100vw - 32px);
   background: transparent;
   padding: 16px;
@@ -562,6 +572,7 @@ body:has(.tabs.fixed) .category-section:first-of-type {
   z-index: 90;
   box-sizing: border-box;
   gap: 12px;
+  min-width: 0;
 }
 
 .detail-icon-btn {
@@ -574,7 +585,10 @@ body:has(.tabs.fixed) .category-section:first-of-type {
   justify-content: center;
   width: 44px;
   height: 44px;
+  min-width: 44px;
+  flex-shrink: 0;
   color: #1f4b99;
+  box-sizing: border-box;
 }
 
 .detail-icon-btn svg {
@@ -586,6 +600,8 @@ body:has(.tabs.fixed) .category-section:first-of-type {
   flex: 1;
   display: flex;
   justify-content: center;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .cart-list {
