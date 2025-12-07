@@ -1967,11 +1967,11 @@ const renderBooking = () => {
           <div style="display:flex; flex-direction:column; gap:16px;">
             <div class="form-group" style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start; width:100%;">
               <div style="flex:1 1 calc(50% - 6px); min-width:0; max-width:100%; box-sizing:border-box;">
-                <label style="display:block; font-weight:600; color:#1c376a; margin-bottom:8px; font-size:14px;">Дата посещения</label>
+                <label style="display:block; font-weight:600; color:#1c376a; margin-bottom:8px; font-size:14px;">Дата посещения <span style="color:#e44b6b;">*</span></label>
                 <input type="date" id="bookingDate" name="date" required style="width:100%; padding:12px; border:1.5px solid #dce5f7; border-radius:12px; font-size:16px; color:#1c376a; background:#fff; box-sizing:border-box; max-width:100%;" min="${today}">
               </div>
               <div style="flex:1 1 calc(50% - 6px); min-width:0; max-width:100%; box-sizing:border-box;">
-                <label style="display:block; font-weight:600; color:#1c376a; margin-bottom:8px; font-size:14px;">Время посещения</label>
+                <label style="display:block; font-weight:600; color:#1c376a; margin-bottom:8px; font-size:14px;">Время посещения <span style="color:#e44b6b;">*</span></label>
                 <div style="display:flex; align-items:center; gap:12px; width:100%;">
                   <input type="time" id="bookingTime" name="time" required style="flex:1; min-width:0; padding:12px; border:1.5px solid #dce5f7; border-radius:12px; font-size:16px; color:#1c376a; background:#fff; box-sizing:border-box;" value="${savedBookingData?.time || ''}">
                   <span style="font-size:12px; color:#6a7ea6; white-space:nowrap; flex-shrink:0;">мин. +15 мин</span>
@@ -1990,25 +1990,25 @@ const renderBooking = () => {
                 <button type="button" class="pill booking-guests ${savedBookingData?.guests === '4' ? 'active' : ''}" data-guests="4">4 человека</button>
                 <button type="button" class="pill booking-guests ${savedBookingData?.guests === '5' ? 'active' : ''}" data-guests="5">5+ человек</button>
               </div>
-              <input type="hidden" id="bookingGuests" name="guests" value="${savedBookingData?.guests || '2'}" required>
+              <input type="hidden" id="bookingGuests" name="guests" value="${savedBookingData?.guests || '2'}">
             </div>
           </div>
           
           <div style="display:flex; flex-direction:column; gap:16px;">
             <div class="form-group">
-              <label style="display:block; font-weight:600; color:#1c376a; margin-bottom:8px; font-size:14px;">Ваше имя</label>
+              <label style="display:block; font-weight:600; color:#1c376a; margin-bottom:8px; font-size:14px;">Ваше имя <span style="color:#e44b6b;">*</span></label>
               <input type="text" id="bookingName" name="name" placeholder="Введите ваше имя" required style="width:100%; padding:12px; border:1.5px solid #dce5f7; border-radius:12px; font-size:16px; color:#1c376a; background:#fff;" value="${savedBookingData?.name || state.user.name}">
             </div>
             
             <div class="form-group">
-              <label style="display:block; font-weight:600; color:#1c376a; margin-bottom:8px; font-size:14px;">Электронная почта</label>
+              <label style="display:block; font-weight:600; color:#1c376a; margin-bottom:8px; font-size:14px;">Электронная почта <span style="color:#e44b6b;">*</span></label>
               <input type="email" id="bookingEmail" name="email" placeholder="Введите вашу почту" required style="width:100%; padding:12px; border:1.5px solid #dce5f7; border-radius:12px; font-size:16px; color:#1c376a; background:#fff;" value="${savedBookingData?.email || ''}">
             </div>
           </div>
           
           <div style="display:flex; flex-direction:column; gap:16px;">
             <div class="form-group">
-              <label style="display:block; font-weight:600; color:#1c376a; margin-bottom:8px; font-size:14px;">Номер телефона</label>
+              <label style="display:block; font-weight:600; color:#1c376a; margin-bottom:8px; font-size:14px;">Номер телефона <span style="color:#e44b6b;">*</span></label>
               <input type="tel" id="bookingPhone" name="phone" placeholder="Введите ваш номер телефона" required style="width:100%; padding:12px; border:1.5px solid #dce5f7; border-radius:12px; font-size:16px; color:#1c376a; background:#fff;" value="${savedBookingData?.phone || ''}">
             </div>
             
@@ -2120,10 +2120,10 @@ const renderBooking = () => {
     const phone = form.querySelector('#bookingPhone')?.value.trim();
     const date = form.querySelector('#bookingDate')?.value;
     const time = form.querySelector('#bookingTime')?.value;
-    const guests = form.querySelector('#bookingGuests')?.value;
+    const guests = form.querySelector('#bookingGuests')?.value || '2'; // По умолчанию 2, если не выбрано
     
-    // Проверяем, что все поля заполнены
-    if (name && email && phone && date && time && guests) {
+    // Проверяем, что все обязательные поля заполнены (guests и studentId необязательны)
+    if (name && email && phone && date && time) {
       // Проверяем, что дата и время не в прошлом и минимум +15 минут от текущего времени
       const selectedDateTime = new Date(`${date}T${time}`);
       const now = new Date();
@@ -2156,7 +2156,7 @@ const renderBooking = () => {
       state.cart = [];
       saveCartToStorage();
     } else {
-      // Если не все поля заполнены, показываем стандартную валидацию HTML5
+      // Если не все обязательные поля заполнены, показываем стандартную валидацию HTML5
       form.reportValidity();
     }
   });
