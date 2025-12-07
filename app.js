@@ -1725,37 +1725,6 @@ const updateTelegramButtons = () => {
       }
     });
   }
-  
-  // Показываем MainButton на странице корзины, если есть товары
-  if (state.view === 'cart' && state.cart.length > 0) {
-    const items = state.cart.map((item) => {
-      const meal = meals.find((m) => m.id === item.mealId);
-      return { ...item, meal };
-    });
-    const total = items.reduce((sum, item) => sum + (item.meal ? item.meal.price * item.qty : 0), 0);
-    tg.MainButton.setText(`Оплатить / забронировать · ${formatPrice(total)}`);
-    tg.MainButton.show();
-    tg.MainButton.onClick(() => {
-      setState({ view: 'booking' });
-    });
-  }
-  
-  // Показываем MainButton на странице бронирования
-  if (state.view === 'booking') {
-    const items = state.cart.map((item) => {
-      const meal = meals.find((m) => m.id === item.mealId);
-      return { ...item, meal };
-    });
-    const total = items.reduce((sum, item) => sum + (item.meal ? item.meal.price * item.qty : 0), 0);
-    tg.MainButton.setText(`Подтвердить бронирование · ${formatPrice(total)}`);
-    tg.MainButton.show();
-    tg.MainButton.onClick(() => {
-      const bookingForm = document.getElementById('bookingForm');
-      if (bookingForm) {
-        bookingForm.dispatchEvent(new Event('submit'));
-      }
-    });
-  }
 };
 
 let previousView = null;
