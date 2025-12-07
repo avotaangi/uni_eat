@@ -470,6 +470,11 @@ const setState = (patch) => {
       }
     });
   }
+  
+  // Обновляем кнопки Telegram после изменения состояния
+  requestAnimationFrame(() => {
+    updateTelegramButtons();
+  });
 };
 
 const getFilteredMeals = () => {
@@ -595,6 +600,10 @@ const addToCart = (mealId, qty = 1, option = null) => {
   }
   state.cart = nextCart;
   saveCartToStorage();
+  // Обновляем кнопки Telegram после изменения корзины
+  requestAnimationFrame(() => {
+    updateTelegramButtons();
+  });
 };
 
 const setCartQty = (mealId, option, qty) => {
@@ -605,6 +614,10 @@ const setCartQty = (mealId, option, qty) => {
     .filter((item) => item.qty > 0);
   state.cart = nextCart;
   saveCartToStorage();
+  // Обновляем кнопки Telegram после изменения корзины
+  requestAnimationFrame(() => {
+    updateTelegramButtons();
+  });
 };
 
 const renderHome = () => {
@@ -725,7 +738,7 @@ const renderHome = () => {
         </div>
         <div class="user-info">
           <div class="user-name">${state.user.name}</div>
-          <div class="user-username">${state.user.username}</div>
+          ${state.user.username ? `<div class="user-username">${state.user.username}</div>` : ''}
         </div>
         ${
           state.hasActiveOrder
@@ -1639,6 +1652,91 @@ const renderBooking = () => {
   );
 };
 
+// Инициализация Telegram Web App
+let tg = null;
+if (window.Telegram && window.Telegram.WebApp) {
+  tg = window.Telegram.WebApp;
+  tg.ready();
+  
+  // Включаем fullscreen режим
+  tg.expand();
+  
+  // Блокируем закрытие свайпом сверху вниз
+  tg.enableClosingConfirmation();
+  
+  // Отключаем вибрацию при нажатии (опционально)
+  tg.HapticFeedback.impactOccurred = () => {};
+  
+  // Получаем данные пользователя из Telegram
+  const user = tg.initDataUnsafe?.user;
+  if (user) {
+    const firstName = user.first_name || '';
+    const lastName = user.last_name || '';
+    const fullName = firstName + (lastName ? ' ' + lastName : '');
+    
+    state.user = {
+      name: fullName || 'Пользователь',
+      username: user.username ? '@' + user.username : '',
+      photo: user.photo_url || null,
+    };
+  }
+}
+
+const updateTelegramButtons = () => {
+  if (!tg) return;
+  
+  // Скрываем кнопки по умолчанию
+  tg.MainButton.hide();
+  tg.BackButton.hide();
+  
+  // Показываем BackButton на всех страницах кроме главной
+  if (state.view !== 'home') {
+    tg.BackButton.show();
+    tg.BackButton.onClick(() => {
+      if (state.view === 'detail') {
+        setState({ view: 'home' });
+      } else if (state.view === 'cart') {
+        setState({ view: 'home' });
+      } else if (state.view === 'favorites') {
+        setState({ view: 'home' });
+      } else if (state.view === 'booking') {
+        setState({ view: 'cart' });
+      }
+    });
+  }
+  
+  // Показываем MainButton на странице корзины, если есть товары
+  if (state.view === 'cart' && state.cart.length > 0) {
+    const items = state.cart.map((item) => {
+      const meal = meals.find((m) => m.id === item.mealId);
+      return { ...item, meal };
+    });
+    const total = items.reduce((sum, item) => sum + (item.meal ? item.meal.price * item.qty : 0), 0);
+    tg.MainButton.setText(`Оплатить / забронировать · ${formatPrice(total)}`);
+    tg.MainButton.show();
+    tg.MainButton.onClick(() => {
+      setState({ view: 'booking' });
+    });
+  }
+  
+  // Показываем MainButton на странице бронирования
+  if (state.view === 'booking') {
+    const items = state.cart.map((item) => {
+      const meal = meals.find((m) => m.id === item.mealId);
+      return { ...item, meal };
+    });
+    const total = items.reduce((sum, item) => sum + (item.meal ? item.meal.price * item.qty : 0), 0);
+    tg.MainButton.setText(`Подтвердить бронирование · ${formatPrice(total)}`);
+    tg.MainButton.show();
+    tg.MainButton.onClick(() => {
+      const bookingForm = document.getElementById('bookingForm');
+      if (bookingForm) {
+        bookingForm.dispatchEvent(new Event('submit'));
+      }
+    });
+  }
+};
+
 const render = () => {
   if (state.view === 'home') {
     renderHome();
@@ -1652,11 +1750,17 @@ const render = () => {
     renderBooking();
   }
   
-  // Прокручиваем страницу наверх после рендеринга
+  // Обновляем кнопки Telegram после рендеринга
   requestAnimationFrame(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
+    updateTelegramButtons();
   });
 };
 
-render();
+// Инициализация при загрузке
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', render);
+} else {
+  render();
+}
 
