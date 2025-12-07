@@ -426,7 +426,6 @@ let state = {
   showDiningInfo: false,
   showClearCartConfirm: false,
   showBookingSuccess: false,
-  hasActiveOrder: localStorage.getItem('uni_eat_order_date') !== null, // Есть ли активный заказ (для отображения QR-кода)
   showQRCode: false,
   activeOrderDate: localStorage.getItem('uni_eat_order_date') || null, // Дата бронирования
   activeOrderTime: localStorage.getItem('uni_eat_order_time') || null, // Время бронирования
@@ -440,6 +439,38 @@ let state = {
 // Загружаем корзину и избранное из localStorage при инициализации
 state.cart = loadCartFromStorage();
 state.favorites = loadFavoritesFromStorage();
+
+// Проверяем истекшее время заказа при инициализации
+if (isOrderTimeExpired() && (state.activeOrderDate || state.activeOrderTime)) {
+  localStorage.removeItem('uni_eat_order_date');
+  localStorage.removeItem('uni_eat_order_time');
+  state.activeOrderDate = null;
+  state.activeOrderTime = null;
+}
+
+// Устанавливаем глобальный таймер для проверки истекшего времени каждую минуту
+let orderCheckInterval = null;
+if (hasActiveOrder()) {
+  orderCheckInterval = setInterval(() => {
+    if (isOrderTimeExpired()) {
+      // Если время истекло, скрываем QR-код и очищаем данные заказа
+      localStorage.removeItem('uni_eat_order_date');
+      localStorage.removeItem('uni_eat_order_time');
+      if (state.view === 'home') {
+        setState({ 
+          showQRCode: false,
+          activeOrderDate: null,
+          activeOrderTime: null
+        });
+      }
+      // Останавливаем таймер, если заказ истек
+      if (orderCheckInterval) {
+        clearInterval(orderCheckInterval);
+        orderCheckInterval = null;
+      }
+    }
+  }, 60000); // Проверяем каждую минуту
+}
 
 const root = document.getElementById('app');
 
@@ -463,16 +494,148 @@ const icons = {
 
 const formatPrice = (value) => `${value} ₽`;
 
+// Функция для проверки, прошло ли 11 минут после назначенного времени
+const isOrderTimeExpired = () => {
+  const orderDate = localStorage.getItem('uni_eat_order_date');
+  const orderTime = localStorage.getItem('uni_eat_order_time');
+  
+  if (!orderDate || !orderTime) {
+    return true; // Если нет данных о заказе, считаем что заказ истек
+  }
+  
+  try {
+    // Создаем объект Date из даты и времени заказа
+    const [year, month, day] = orderDate.split('-').map(Number);
+    const [hours, minutes] = orderTime.split(':').map(Number);
+    const orderDateTime = new Date(year, month - 1, day, hours, minutes);
+    
+    // Добавляем 11 минут к времени заказа
+    const expirationTime = new Date(orderDateTime.getTime() + 11 * 60 * 1000);
+    
+    // Проверяем, прошло ли время
+    return new Date() > expirationTime;
+  } catch (e) {
+    console.error('Ошибка проверки времени заказа:', e);
+    return true;
+  }
+};
+
+// Функция для проверки, есть ли активный заказ
+const hasActiveOrder = () => {
+  const orderDate = localStorage.getItem('uni_eat_order_date');
+  const orderTime = localStorage.getItem('uni_eat_order_time');
+  
+  if (!orderDate || !orderTime) {
+    return false;
+  }
+  
+  return !isOrderTimeExpired();
+};
+
 // Функция для предотвращения висячих предлогов
+// Функции для работы с изображениями в localStorage
+const imageCachePrefix = 'uni_eat_image_';
+
+// Конвертация изображения в base64
+const imageToBase64 = (url) => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      try {
+        const base64 = canvas.toDataURL('image/png');
+        resolve(base64);
+      } catch (e) {
+        reject(e);
+      }
+    };
+    img.onerror = () => reject(new Error('Failed to load image'));
+    img.src = url;
+  });
+};
+
+// Сохранение изображения в localStorage
+const saveImageToStorage = (path, base64) => {
+  try {
+    const key = imageCachePrefix + encodeURIComponent(path);
+    localStorage.setItem(key, base64);
+  } catch (e) {
+    console.error('Ошибка сохранения изображения в localStorage:', e);
+    // Если превышен лимит, удаляем старые изображения
+    if (e.name === 'QuotaExceededError') {
+      clearOldImages();
+      try {
+        const key = imageCachePrefix + encodeURIComponent(path);
+        localStorage.setItem(key, base64);
+      } catch (e2) {
+        console.error('Не удалось сохранить изображение после очистки:', e2);
+      }
+    }
+  }
+};
+
+// Загрузка изображения из localStorage
+const loadImageFromStorage = (path) => {
+  try {
+    const key = imageCachePrefix + encodeURIComponent(path);
+    return localStorage.getItem(key);
+  } catch (e) {
+    console.error('Ошибка загрузки изображения из localStorage:', e);
+    return null;
+  }
+};
+
+// Очистка старых изображений (удаляет первые 5)
+const clearOldImages = () => {
+  try {
+    const keys = Object.keys(localStorage).filter(key => key.startsWith(imageCachePrefix));
+    if (keys.length > 0) {
+      keys.slice(0, 5).forEach(key => localStorage.removeItem(key));
+    }
+  } catch (e) {
+    console.error('Ошибка очистки старых изображений:', e);
+  }
+};
+
+// Загрузка всех изображений и сохранение в localStorage
+const preloadImages = async () => {
+  const uniqueImages = [...new Set(meals.map(meal => meal.image))];
+  const promises = uniqueImages.map(async (path) => {
+    // Проверяем, есть ли уже в localStorage
+    if (loadImageFromStorage(path)) {
+      return;
+    }
+    try {
+      const encodedPath = encodeImagePath(path);
+      const base64 = await imageToBase64(encodedPath);
+      saveImageToStorage(path, base64);
+    } catch (e) {
+      console.error(`Ошибка загрузки изображения ${path}:`, e);
+    }
+  });
+  await Promise.all(promises);
+};
+
 // Функция для правильного кодирования путей к изображениям
 const encodeImagePath = (path) => {
   if (!path) return path;
-  // Разделяем путь на директорию и имя файла
+  
+  // Сначала проверяем localStorage
+  const cached = loadImageFromStorage(path);
+  if (cached) {
+    return cached;
+  }
+  
+  // Если нет в кеше, используем оригинальный путь
   const parts = path.split('/');
   if (parts.length < 2) return path;
   const dir = parts[0];
-  const filename = parts.slice(1).join('/'); // На случай, если в имени файла есть слеши
-  // Кодируем только имя файла, директорию оставляем как есть
+  const filename = parts.slice(1).join('/');
   return dir + '/' + encodeURIComponent(filename).replace(/%2F/g, '/');
 };
 
@@ -816,7 +979,7 @@ const renderHome = () => {
           ${state.user.username ? `<div class="user-username">${state.user.username}</div>` : ''}
         </div>
         ${
-          state.hasActiveOrder
+          hasActiveOrder()
             ? `<button class="dining-info-btn" data-show-qr style="width:42px; height:42px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#1f4b99; background:none; border:none; padding:0; margin-left:auto;">${icons.qrcode}</button>`
             : ''
         }
@@ -844,6 +1007,9 @@ const renderHome = () => {
                       <div style="display:flex; align-items:center; gap:8px; color:#4b5d86; font-size:14px;">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                         <span>${state.activeOrderTime}</span>
+                      </div>
+                      <div style="color:#6a7ea6; font-size:12px; text-align:center; margin-top:4px;">
+                        У вас есть 10 минут, чтобы забрать заказ
                       </div>
                     </div>`
                   : ''
@@ -1060,7 +1226,19 @@ const renderHome = () => {
   // Обработчик для показа QR-кода
   root.querySelector('[data-show-qr]')?.addEventListener('click', (e) => {
     e.stopPropagation();
-    setState({ showQRCode: true });
+    // Проверяем, не истекло ли время заказа
+    if (!isOrderTimeExpired()) {
+      setState({ showQRCode: true });
+    } else {
+      // Если время истекло, скрываем QR-код и очищаем данные заказа
+      localStorage.removeItem('uni_eat_order_date');
+      localStorage.removeItem('uni_eat_order_time');
+      setState({ 
+        showQRCode: false,
+        activeOrderDate: null,
+        activeOrderTime: null
+      });
+    }
   });
 
   // Обработчик для закрытия QR-кода
@@ -1074,6 +1252,29 @@ const renderHome = () => {
       setState({ showQRCode: false });
     }
   });
+  
+  // Проверяем истекшее время заказа и скрываем QR-код если нужно
+  if (state.showQRCode && isOrderTimeExpired()) {
+    localStorage.removeItem('uni_eat_order_date');
+    localStorage.removeItem('uni_eat_order_time');
+    setState({ 
+      showQRCode: false,
+      activeOrderDate: null,
+      activeOrderTime: null
+    });
+  }
+  
+  // Проверяем истекшее время при загрузке страницы
+  if (isOrderTimeExpired() && (state.activeOrderDate || state.activeOrderTime)) {
+    localStorage.removeItem('uni_eat_order_date');
+    localStorage.removeItem('uni_eat_order_time');
+    if (state.view === 'home') {
+      setState({ 
+        activeOrderDate: null,
+        activeOrderTime: null
+      });
+    }
+  }
 
   // Закрытие модального окна при клике вне его
   if (state.showDiningInfo) {
@@ -1725,10 +1926,42 @@ const renderBooking = () => {
     </div>
   `;
 
+  // Функция для обновления минимального времени в зависимости от выбранной даты
+  const updateTimeMin = () => {
+    const dateInput = root.querySelector('#bookingDate');
+    const timeInput = root.querySelector('#bookingTime');
+    if (!dateInput || !timeInput) return;
+    
+    const selectedDate = dateInput.value;
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    
+    if (selectedDate === todayStr) {
+      // Если выбрана сегодняшняя дата, минимальное время - текущее время + 10 минут
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes() + 10).padStart(2, '0');
+      const minTime = `${hours}:${minutes}`;
+      timeInput.setAttribute('min', minTime);
+      
+      // Если текущее время больше выбранного, сбрасываем время
+      if (timeInput.value && timeInput.value < minTime) {
+        timeInput.value = '';
+      }
+    } else {
+      // Если выбрана будущая дата, минимальное время не ограничено
+      timeInput.removeAttribute('min');
+    }
+  };
+
   // Устанавливаем сегодняшнюю дату по умолчанию
   const dateInput = root.querySelector('#bookingDate');
   if (dateInput) {
     dateInput.value = today;
+    // Обновляем минимальное время при изменении даты
+    dateInput.addEventListener('change', updateTimeMin);
+    dateInput.addEventListener('input', updateTimeMin);
+    // Инициализируем минимальное время
+    updateTimeMin();
   }
 
 
@@ -1785,6 +2018,14 @@ const renderBooking = () => {
           e.target.setSelectionRange(3, 3);
         }, 0);
       }
+      
+      // Проверяем валидность времени при вводе
+      updateTimeMin();
+    });
+    
+    // Проверяем валидность времени при изменении
+    timeInput.addEventListener('change', () => {
+      updateTimeMin();
     });
   }
 
@@ -1802,6 +2043,16 @@ const renderBooking = () => {
     
     // Проверяем, что все поля заполнены
     if (name && email && phone && date && time && guests) {
+      // Проверяем, что дата и время не в прошлом
+      const selectedDateTime = new Date(`${date}T${time}`);
+      const now = new Date();
+      // Добавляем 10 минут к текущему времени для учета погрешности
+      const minDateTime = new Date(now.getTime() + 10 * 60 * 1000);
+      
+      if (selectedDateTime < minDateTime) {
+        alert('Нельзя выбрать прошедшую дату и время. Пожалуйста, выберите будущую дату и время.');
+        return;
+      }
       // Сохраняем данные бронирования в localStorage (кроме даты для автозаполнения, но сохраняем для QR-кода)
       saveBookingDataToStorage({
         name,
@@ -1815,8 +2066,7 @@ const renderBooking = () => {
       
       // Показываем модальное окно успеха
       setState({ 
-        showBookingSuccess: true, 
-        hasActiveOrder: true,
+        showBookingSuccess: true,
         activeOrderDate: date,
         activeOrderTime: time
       });
@@ -1933,8 +2183,24 @@ const render = () => {
 
 // Инициализация при загрузке
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', render);
+  document.addEventListener('DOMContentLoaded', () => {
+    render();
+    // Предзагрузка изображений в фоне
+    preloadImages().then(() => {
+      // После загрузки всех изображений перерисовываем страницу
+      if (state.view === 'home' || state.view === 'detail' || state.view === 'cart' || state.view === 'favorites') {
+        render();
+      }
+    });
+  });
 } else {
   render();
+  // Предзагрузка изображений в фоне
+  preloadImages().then(() => {
+    // После загрузки всех изображений перерисовываем страницу
+    if (state.view === 'home' || state.view === 'detail' || state.view === 'cart' || state.view === 'favorites') {
+      render();
+    }
+  });
 }
 
