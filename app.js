@@ -814,8 +814,17 @@ const renderHome = () => {
     btn.addEventListener('click', () => {
       const category = btn.dataset.cat;
       
-      // Сохраняем активный фильтр
-      setState({ activeCategory: category });
+      // Сохраняем активный фильтр без перерисовки
+      state.activeCategory = category;
+      
+      // Обновляем активное состояние кнопок
+      root.querySelectorAll('[data-cat]').forEach((b) => {
+        if (b.dataset.cat === category) {
+          b.classList.add('active');
+        } else {
+          b.classList.remove('active');
+        }
+      });
       
       // Прокрутка к категории
       if (category === 'Все') {
@@ -1737,22 +1746,33 @@ const updateTelegramButtons = () => {
   }
 };
 
+let previousView = null;
+
 const render = () => {
-  if (state.view === 'home') {
+  const currentView = state.view;
+  
+  if (currentView === 'home') {
     renderHome();
-  } else if (state.view === 'detail') {
+  } else if (currentView === 'detail') {
     renderDetail();
-  } else if (state.view === 'cart') {
+  } else if (currentView === 'cart') {
     renderCart();
-  } else if (state.view === 'favorites') {
+  } else if (currentView === 'favorites') {
     renderFavorites();
-  } else if (state.view === 'booking') {
+  } else if (currentView === 'booking') {
     renderBooking();
+  }
+  
+  // Прокручиваем наверх только при смене страницы, а не при каждом рендере
+  if (previousView !== currentView) {
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    });
+    previousView = currentView;
   }
   
   // Обновляем кнопки Telegram после рендеринга
   requestAnimationFrame(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
     updateTelegramButtons();
   });
 };
