@@ -25,3 +25,13 @@ node_modules/
 *.tmp
 *.temp
 
+# Prevent octal-encoded directory paths (accidental encoding artifacts)
+# These are directories with numeric names that represent octal-encoded Cyrillic characters
+images/[0-9]*/
+images/**/[0-9]*/
+**/images/**/[0-9]*/
+# Specific patterns for common octal-encoded paths
+images/320/
+images/321/
+images/322/
+
