@@ -638,9 +638,13 @@ const getFilteredMeals = () => {
   
   // Фильтр только по поиску, все категории всегда показываются
   if (hasSearch) {
-    return meals.filter((meal) =>
-      meal.name.toLowerCase().includes(state.search.toLowerCase())
-    );
+    const searchLower = state.search.toLowerCase().trim();
+    return meals.filter((meal) => {
+      const nameMatch = meal.name.toLowerCase().includes(searchLower);
+      const shortNameMatch = meal.shortName.toLowerCase().includes(searchLower);
+      const descriptionMatch = meal.description.toLowerCase().includes(searchLower);
+      return nameMatch || shortNameMatch || descriptionMatch;
+    });
   }
   
   return meals;
@@ -1184,140 +1188,63 @@ const renderHome = () => {
   );
 
 
-  const searchInput = root.querySelector('[data-search-input]');
-  if (searchInput) {
+  // Обработчики для поисковой строки - используем делегирование событий
+  if (!root.dataset.searchHandlersAttached) {
+    root.dataset.searchHandlersAttached = 'true';
     let searchTimeout = null;
-    searchInput.addEventListener('input', (e) => {
-      e.stopPropagation();
-      const value = e.target.value;
-      
-      // Обновляем значение в state сразу (без перерисовки)
-      state.search = value;
-      
-      // Обновляем кнопку очистки поиска без перерисовки
-      const clearBtn = root.querySelector('[data-clear-search]');
-      if (value && !clearBtn) {
-        const searchContainer = root.querySelector('.search');
-        if (searchContainer) {
-          searchContainer.insertAdjacentHTML('beforeend', `<button class="clear-search" data-clear-search title="Очистить">${icons.close}</button>`);
-          root.querySelector('[data-clear-search]')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const input = root.querySelector('[data-search-input]');
-            if (input) {
-              input.value = '';
-              state.search = '';
-              setState({ search: '' });
-            }
-          });
-        }
-      } else if (!value && clearBtn) {
-        clearBtn.remove();
-      }
-      
-      // Обновляем результаты поиска с задержкой (debounce)
-      // чтобы не блокировать ввод, но обновлять результаты
+    
+    const updateSearchResults = (value) => {
+      // Обновляем результаты поиска через setState для полной перерисовки
       if (searchTimeout) {
         clearTimeout(searchTimeout);
       }
       
-      // Сохраняем текущее состояние input перед обновлением
-      const currentSelectionStart = searchInput.selectionStart;
-      const currentSelectionEnd = searchInput.selectionEnd;
-      
       searchTimeout = setTimeout(() => {
-        // НЕ ТРОГАЕМ INPUT ВООБЩЕ! Обновляем только state.search и результаты
-        state.search = value;
+        const currentInput = root.querySelector('[data-search-input]');
+        if (!currentInput) return;
         
-        // Обновляем DOM только для результатов поиска, НЕ перерисовывая весь root
-        const mealsList = root.querySelector('.meals-list');
-        if (mealsList) {
-          const mealsToShow = getFilteredMeals();
-          const favoritesView = state.view === 'favorites';
-          const filteredMeals = favoritesView
-            ? mealsToShow.filter((m) => state.favorites.has(m.id))
-            : mealsToShow;
-          
-          // Группируем блюда по категориям
-          const categoryOrder = categories.filter(cat => cat !== 'Все');
-          const mealsByCategory = {};
-          filteredMeals.forEach((meal) => {
-            if (!mealsByCategory[meal.category]) {
-              mealsByCategory[meal.category] = [];
-            }
-            mealsByCategory[meal.category].push(meal);
-          });
-          const sortedCategories = categoryOrder.filter(cat => mealsByCategory[cat]);
-          
-          const categoriesContent = sortedCategories
-            .map((category) => {
-              const categoryMeals = mealsByCategory[category];
-              const categoryCards = categoryMeals
-                .map(
-                  (meal) => `
-          <div class="meal-card" data-id="${meal.id}">
-            <div class="img-wrap">
-              <img src="${encodeImagePath(meal.image)}" alt="${meal.name}">
-              <div class="fav" data-fav="${meal.id}">${icons.heart(
-                    state.favorites.has(meal.id)
-                  )}</div>
-            </div>
-            <div class="name">${preventHangingPrepositions(meal.shortName)}</div>
-            <div class="price">${formatPrice(meal.price)}</div>
-            ${(() => {
-              const cartItem = state.cart.find(item => item.mealId === meal.id && (item.option === (meal.options[0] ?? null)));
-              if (cartItem) {
-                return `
-                  <div class="qty-controls" data-meal-id="${meal.id}" data-option="${cartItem.option ?? ''}">
-                    <button class="qty-btn" data-dec="${meal.id}" data-opt="${cartItem.option ?? ''}">${icons.minus}</button>
-                    <span class="qty-value">${cartItem.qty}</span>
-                    <button class="qty-btn" data-inc="${meal.id}" data-opt="${cartItem.option ?? ''}">${icons.plus}</button>
-                  </div>
-                `;
-              }
-              return `<button class="add-btn" data-add="${meal.id}">${icons.plus}</button>`;
-            })()}
-          </div>
-        `
-                )
-                .join('');
-              
-              return `
-        <div class="category-section" data-category="${category}">
-          <h2 class="category-title">${category}</h2>
-          <div class="grid">${categoryCards}</div>
-        </div>
-      `;
-            })
-            .join('');
-          
-          mealsList.innerHTML = categoriesContent;
-        }
-        
-        // НЕ ТРОГАЕМ INPUT - он остается в фокусе и с клавиатурой!
-      }, 300); // Задержка для плавности ввода
+        const currentValue = currentInput.value;
+        setState({ search: currentValue });
+      }, 300);
+    };
+    
+    // Используем делегирование событий для поиска
+    root.addEventListener('input', (e) => {
+      if (e.target.matches('[data-search-input]')) {
+        e.stopPropagation();
+        updateSearchResults(e.target.value);
+      }
     });
     
-    // Предотвращаем всплытие событий, чтобы не мешать вводу
-    searchInput.addEventListener('keydown', (e) => {
-      e.stopPropagation();
+    root.addEventListener('keyup', (e) => {
+      if (e.target.matches('[data-search-input]')) {
+        e.stopPropagation();
+        updateSearchResults(e.target.value);
+      }
     });
-    searchInput.addEventListener('keyup', (e) => {
-      e.stopPropagation();
+    
+    root.addEventListener('change', (e) => {
+      if (e.target.matches('[data-search-input]')) {
+        e.stopPropagation();
+        updateSearchResults(e.target.value);
+      }
     });
-    searchInput.addEventListener('focus', (e) => {
-      e.stopPropagation();
-    });
-    searchInput.addEventListener('click', (e) => {
-      e.stopPropagation();
-    });
-    // Не добавляем обработчик blur, чтобы клавиатура не скрывалась автоматически
-    // при обновлении результатов поиска, но пользователь мог закрыть её вручную
   }
-
-  root.querySelector('[data-clear-search]')?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    setState({ search: '' });
-  });
+  
+  // Обработчик для кнопки очистки поиска - используем делегирование событий
+  if (!root.dataset.clearSearchHandlerAttached) {
+    root.dataset.clearSearchHandlerAttached = 'true';
+    root.addEventListener('click', (e) => {
+      if (e.target.closest('[data-clear-search]')) {
+        e.stopPropagation();
+        const input = root.querySelector('[data-search-input]');
+        if (input) {
+          input.value = '';
+          setState({ search: '' });
+        }
+      }
+    });
+  }
 
   root.querySelector('.search')?.addEventListener('click', (e) => {
     e.stopPropagation();
