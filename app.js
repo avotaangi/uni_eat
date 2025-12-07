@@ -1073,38 +1073,45 @@ const renderHome = () => {
         e.stopPropagation();
         const mealId = btn.dataset.inc;
         const option = btn.dataset.opt === '' ? null : btn.dataset.opt;
-        const cartItem = state.cart.find(item => item.mealId === mealId && (item.option === option));
+        // Нормализуем опцию для поиска
+        const normalizedOption = (option === 'null' || option === null || option === undefined) ? null : option;
+        const cartItem = state.cart.find(item => {
+          const itemOption = (item.option === 'null' || item.option === null || item.option === undefined) ? null : item.option;
+          return item.mealId === mealId && itemOption === normalizedOption;
+        });
+        
         if (cartItem) {
           const newQty = cartItem.qty + 1;
-          setCartQty(mealId, option, newQty);
-          // Обновляем только элемент управления количеством
+          // Сразу обновляем отображение перед вызовом setCartQty
           const qtyControls = btn.closest('.qty-controls');
           if (qtyControls) {
-            const updatedItem = state.cart.find(item => item.mealId === mealId && (item.option === option));
-            if (updatedItem) {
-              const qtyValue = qtyControls.querySelector('.qty-value');
-              if (qtyValue) {
-                qtyValue.textContent = updatedItem.qty;
-              }
+            const qtyValue = qtyControls.querySelector('.qty-value');
+            if (qtyValue) {
+              qtyValue.textContent = newQty;
             }
           }
+          setCartQty(mealId, normalizedOption, newQty);
         } else {
           // Если элемента нет в корзине, добавляем его
           const meal = meals.find(m => m.id === mealId);
           if (meal) {
-            addToCart(mealId, 1, option);
+            addToCart(mealId, 1, normalizedOption);
             // Обновляем кнопку на qty-controls
             const mealCard = btn.closest('.meal-card');
             if (mealCard) {
               const addBtn = mealCard.querySelector('[data-add]');
               if (addBtn) {
-                const cartItem = state.cart.find(item => item.mealId === mealId && (item.option === option));
-                if (cartItem) {
+                // Ищем обновленный элемент в корзине после добавления
+                const updatedCartItem = state.cart.find(item => {
+                  const itemOption = (item.option === 'null' || item.option === null || item.option === undefined) ? null : item.option;
+                  return item.mealId === mealId && itemOption === normalizedOption;
+                });
+                if (updatedCartItem) {
                   addBtn.outerHTML = `
-                    <div class="qty-controls" data-meal-id="${mealId}" data-option="${option}">
-                      <button class="qty-btn" data-dec="${mealId}" data-opt="${option}">${icons.minus}</button>
-                      <span class="qty-value">${cartItem.qty}</span>
-                      <button class="qty-btn" data-inc="${mealId}" data-opt="${option}">${icons.plus}</button>
+                    <div class="qty-controls" data-meal-id="${mealId}" data-option="${normalizedOption ?? ''}">
+                      <button class="qty-btn" data-dec="${mealId}" data-opt="${normalizedOption ?? ''}">${icons.minus}</button>
+                      <span class="qty-value">${updatedCartItem.qty}</span>
+                      <button class="qty-btn" data-inc="${mealId}" data-opt="${normalizedOption ?? ''}">${icons.plus}</button>
                     </div>
                   `;
                 }
@@ -1123,26 +1130,35 @@ const renderHome = () => {
         e.stopPropagation();
         const mealId = btn.dataset.dec;
         const option = btn.dataset.opt === '' ? null : btn.dataset.opt;
-        const cartItem = state.cart.find(item => item.mealId === mealId && (item.option === option));
+        // Нормализуем опцию для поиска
+        const normalizedOption = (option === 'null' || option === null || option === undefined) ? null : option;
+        const cartItem = state.cart.find(item => {
+          const itemOption = (item.option === 'null' || item.option === null || item.option === undefined) ? null : item.option;
+          return item.mealId === mealId && itemOption === normalizedOption;
+        });
+        
         if (cartItem && cartItem.qty > 0) {
           const newQty = cartItem.qty - 1;
-          setCartQty(mealId, option, newQty);
-          // Обновляем только элемент управления количеством
           const qtyControls = btn.closest('.qty-controls');
-          if (qtyControls) {
-            const updatedItem = state.cart.find(item => item.mealId === mealId && (item.option === option));
-            if (updatedItem && updatedItem.qty > 0) {
+          
+          if (newQty > 0) {
+            // Сразу обновляем отображение перед вызовом setCartQty
+            if (qtyControls) {
               const qtyValue = qtyControls.querySelector('.qty-value');
               if (qtyValue) {
-                qtyValue.textContent = updatedItem.qty;
+                qtyValue.textContent = newQty;
               }
-            } else {
-              // Удаляем из корзины и возвращаем кнопку добавления
+            }
+            setCartQty(mealId, normalizedOption, newQty);
+          } else {
+            // Если количество стало 0, удаляем из корзины и возвращаем кнопку добавления
+            if (qtyControls) {
               const meal = meals.find(m => m.id === mealId);
-              if (meal && qtyControls) {
+              if (meal) {
                 qtyControls.outerHTML = `<button class="add-btn" data-add="${mealId}">${icons.plus}</button>`;
               }
             }
+            setCartQty(mealId, normalizedOption, 0);
           }
         }
       }
