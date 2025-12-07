@@ -417,6 +417,18 @@ const icons = {
 const formatPrice = (value) => `${value} ₽`;
 
 // Функция для предотвращения висячих предлогов
+// Функция для правильного кодирования путей к изображениям
+const encodeImagePath = (path) => {
+  if (!path) return path;
+  // Разделяем путь на директорию и имя файла
+  const parts = path.split('/');
+  if (parts.length < 2) return path;
+  const dir = parts[0];
+  const filename = parts.slice(1).join('/'); // На случай, если в имени файла есть слеши
+  // Кодируем только имя файла, директорию оставляем как есть
+  return dir + '/' + encodeURIComponent(filename).replace(/%2F/g, '/');
+};
+
 const preventHangingPrepositions = (text) => {
   if (!text) return text;
   // Список предлогов, которые не должны оставаться последним словом в строке
@@ -649,7 +661,7 @@ const renderHome = () => {
           (meal) => `
           <div class="meal-card" data-id="${meal.id}">
             <div class="img-wrap">
-              <img src="${meal.image}" alt="${meal.name}">
+              <img src="${encodeImagePath(meal.image)}" alt="${meal.name}">
               <div class="fav" data-fav="${meal.id}">${icons.heart(
               state.favorites.has(meal.id)
             )}</div>
@@ -1037,7 +1049,7 @@ const renderDetail = () => {
         <div style="color:#566fa2; font-weight:600; margin-bottom:6px;">${meal.category}</div>
         <div style="font-size:24px; font-weight:700; color:#1c376a; margin-bottom:14px;">${preventHangingPrepositions(meal.name)}</div>
         <div class="detail-image-wrap">
-          <img src="${meal.image}" alt="${meal.name}">
+          <img src="${encodeImagePath(meal.image)}" alt="${meal.name}">
         </div>
       </div>
 
@@ -1194,7 +1206,7 @@ const renderCart = () => {
               .map(
                 (item) => `
               <div class="cart-item">
-                <img src="${item.meal.image}" alt="${item.meal.name}">
+                <img src="${encodeImagePath(item.meal.image)}" alt="${item.meal.name}">
                 <div>
                   <div class="cart-title">${preventHangingPrepositions(item.meal.name)}</div>
                   ${item.option ? `<div style="color:#6a7ea6;">${item.option}</div>` : ''}
@@ -1341,7 +1353,7 @@ const renderFavorites = () => {
           (meal) => `
           <div class="meal-card" data-id="${meal.id}">
             <div class="img-wrap">
-              <img src="${meal.image}" alt="${meal.name}">
+              <img src="${encodeImagePath(meal.image)}" alt="${meal.name}">
               <div class="fav" data-fav="${meal.id}">${icons.heart(
               state.favorites.has(meal.id)
             )}</div>
