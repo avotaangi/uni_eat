@@ -1084,11 +1084,12 @@ const renderHome = () => {
 
   const searchInput = root.querySelector('[data-search-input]');
   if (searchInput) {
+    let searchTimeout = null;
     searchInput.addEventListener('input', (e) => {
       e.stopPropagation();
       const value = e.target.value;
       
-      // Обновляем значение в state сразу
+      // Обновляем значение в state сразу (без перерисовки)
       state.search = value;
       
       // Обновляем кнопку очистки поиска без перерисовки
@@ -1111,8 +1112,32 @@ const renderHome = () => {
         clearBtn.remove();
       }
       
-      // Обновляем результаты поиска сразу, но сохраняем фокус
-      setState({ search: value });
+      // Обновляем результаты поиска с задержкой (debounce)
+      // чтобы не блокировать ввод, но обновлять результаты
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+      
+      // Сохраняем текущее состояние input перед обновлением
+      const currentSelectionStart = searchInput.selectionStart;
+      const currentSelectionEnd = searchInput.selectionEnd;
+      
+      searchTimeout = setTimeout(() => {
+        // Используем setState, который правильно восстанавливает фокус
+        setState({ search: value });
+        
+        // Дополнительно восстанавливаем позицию курсора после обновления
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const input = root.querySelector('[data-search-input]');
+            if (input && document.activeElement === input) {
+              const newStart = Math.min(currentSelectionStart, value.length);
+              const newEnd = Math.min(currentSelectionEnd, value.length);
+              input.setSelectionRange(newStart, newEnd);
+            }
+          });
+        });
+      }, 300); // Задержка для плавности ввода
     });
     
     // Предотвращаем всплытие событий, чтобы не мешать вводу
@@ -1242,7 +1267,60 @@ const renderHome = () => {
       ? firstCategorySection.offsetTop - tabsElement.offsetHeight - 20
       : tabsElement.offsetTop;
     
+    // Функция для определения видимой категории
+    const getVisibleCategory = () => {
+      const categorySections = root.querySelectorAll('.category-section');
+      const tabsHeight = tabsElement.offsetHeight;
+      const scrollOffset = window.scrollY + tabsHeight + 100; // Отступ для определения активной категории
+      
+      // Проверяем каждую секцию категории
+      for (let i = 0; i < categorySections.length; i++) {
+        const section = categorySections[i];
+        const sectionTop = section.offsetTop;
+        const sectionBottom = sectionTop + section.offsetHeight;
+        
+        // Если секция находится в видимой области
+        if (scrollOffset >= sectionTop && scrollOffset < sectionBottom) {
+          return section.dataset.category;
+        }
+      }
+      
+      // Если прокрутили до начала, возвращаем первую категорию
+      if (window.scrollY < tabsOffsetTop) {
+        return categorySections[0]?.dataset.category || categories[0];
+      }
+      
+      // Если прокрутили до конца, возвращаем последнюю категорию
+      if (categorySections.length > 0) {
+        const lastSection = categorySections[categorySections.length - 1];
+        if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 50) {
+          return lastSection.dataset.category;
+        }
+      }
+      
+      // По умолчанию возвращаем первую категорию
+      return categorySections[0]?.dataset.category || categories[0];
+    };
+    
+    // Функция для обновления активного таба
+    const updateActiveTab = () => {
+      const visibleCategory = getVisibleCategory();
+      if (visibleCategory && visibleCategory !== state.activeCategory) {
+        state.activeCategory = visibleCategory;
+        
+        // Обновляем активное состояние кнопок
+        root.querySelectorAll('[data-cat]').forEach((btn) => {
+          if (btn.dataset.cat === visibleCategory) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+      }
+    };
+    
     const handleScroll = () => {
+      // Обновляем фиксацию табов
       if (window.scrollY >= tabsOffsetTop) {
         tabsElement.classList.add('fixed');
         if (firstCategorySection) {
@@ -1254,6 +1332,9 @@ const renderHome = () => {
           firstCategorySection.style.marginTop = '24px';
         }
       }
+      
+      // Обновляем активный таб в зависимости от видимой категории
+      updateActiveTab();
     };
     
     window.addEventListener('scroll', handleScroll, { passive: true });
