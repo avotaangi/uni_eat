@@ -554,20 +554,18 @@ const encodeImagePath = (path) => {
   return encodedParts.join('/');
 };
 
-// Функция для получения дефолтного изображения (иконка еды на сером фоне)
+// Функция для получения дефолтного изображения (тарелка на сером фоне)
 const getDefaultFoodImage = () => {
   const svg = `<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
   <rect width="200" height="200" fill="#e5e7eb"/>
   <g transform="translate(100, 100)">
-    <circle cx="0" cy="0" r="35" fill="#d1d5db" opacity="0.5"/>
-    <path d="M-20,-12 Q-20,-20 -12,-20 Q-4,-20 -4,-12 Q-4,-4 -12,-4 Q-20,-4 -20,-12 Z" fill="#9ca3af"/>
-    <path d="M4,-12 Q4,-20 12,-20 Q20,-20 20,-12 Q20,-4 12,-4 Q4,-4 4,-12 Z" fill="#9ca3af"/>
-    <path d="M-20,4 Q-20,12 -12,12 Q-4,12 -4,4 Q-4,-4 -12,-4 Q-20,-4 -20,4 Z" fill="#9ca3af"/>
-    <path d="M4,4 Q4,12 12,12 Q20,12 20,4 Q20,-4 12,-4 Q4,-4 4,4 Z" fill="#9ca3af"/>
-    <circle cx="-10" cy="-10" r="2.5" fill="#6b7280"/>
-    <circle cx="10" cy="-10" r="2.5" fill="#6b7280"/>
-    <circle cx="-10" cy="10" r="2.5" fill="#6b7280"/>
-    <circle cx="10" cy="10" r="2.5" fill="#6b7280"/>
+    <!-- Тарелка -->
+    <ellipse cx="0" cy="10" rx="45" ry="8" fill="#d1d5db"/>
+    <ellipse cx="0" cy="0" rx="50" ry="50" fill="#f3f4f6" stroke="#d1d5db" stroke-width="2"/>
+    <ellipse cx="0" cy="0" rx="42" ry="42" fill="none" stroke="#d1d5db" stroke-width="1.5"/>
+    <!-- Вилка и нож -->
+    <path d="M-25,-20 L-25,25 M-25,-15 L-20,-10 L-20,0 L-25,5" stroke="#9ca3af" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+    <path d="M25,-20 L25,25 M25,-15 L30,-10 L30,0 L25,5" stroke="#9ca3af" stroke-width="2.5" stroke-linecap="round" fill="none"/>
   </g>
 </svg>`;
   return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
@@ -949,7 +947,7 @@ const renderHome = () => {
                         <span>${state.activeOrderTime}</span>
                       </div>
                       <div style="color:#6a7ea6; font-size:12px; text-align:center; margin-top:4px;">
-                        У вас есть 10 минут, чтобы забрать заказ
+                        У вас будет 10 минут, чтобы забрать заказ
                       </div>
                     </div>`
                   : ''
