@@ -252,7 +252,7 @@ const meals = [
     category: 'Напитки',
     price: 20,
     options: [],
-    image: 'images/чай.png',
+    image: 'images/ча.png',
   },
   {
     id: 'soda',
