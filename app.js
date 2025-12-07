@@ -1471,16 +1471,16 @@ const renderBooking = () => {
         
         <form id="bookingForm" style="display:flex; flex-direction:column; gap:16px;">
           <div style="display:flex; flex-direction:column; gap:16px;">
-            <div class="form-group" style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
-              <div style="flex:1; min-width:150px;">
+            <div class="form-group" style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start;">
+              <div style="flex:1; min-width:150px; box-sizing:border-box;">
                 <label style="display:block; font-weight:600; color:#1c376a; margin-bottom:8px; font-size:14px;">Дата посещения</label>
-                <input type="date" id="bookingDate" name="date" required style="width:100%; padding:12px; border:1.5px solid #dce5f7; border-radius:12px; font-size:16px; color:#1c376a; background:#fff;" min="${today}">
+                <input type="date" id="bookingDate" name="date" required style="width:100%; padding:12px; border:1.5px solid #dce5f7; border-radius:12px; font-size:16px; color:#1c376a; background:#fff; box-sizing:border-box;" min="${today}">
               </div>
-              <div style="flex:1; min-width:150px;">
+              <div style="flex:1; min-width:150px; box-sizing:border-box;">
                 <label style="display:block; font-weight:600; color:#1c376a; margin-bottom:8px; font-size:14px;">Время посещения</label>
                 <div style="display:flex; align-items:center; gap:12px;">
-                  <input type="time" id="bookingTime" name="time" required style="flex:1; padding:12px; border:1.5px solid #dce5f7; border-radius:12px; font-size:16px; color:#1c376a; background:#fff;" value="${savedBookingData?.time || ''}">
-                  <span style="font-size:12px; color:#6a7ea6; white-space:nowrap;">± 10 минут</span>
+                  <input type="time" id="bookingTime" name="time" required style="flex:1; padding:12px; border:1.5px solid #dce5f7; border-radius:12px; font-size:16px; color:#1c376a; background:#fff; box-sizing:border-box; min-width:0;" value="${savedBookingData?.time || ''}">
+                  <span style="font-size:12px; color:#6a7ea6; white-space:nowrap; flex-shrink:0;">± 10 минут</span>
                 </div>
               </div>
             </div>
