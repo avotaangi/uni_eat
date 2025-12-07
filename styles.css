@@ -36,6 +36,7 @@ body:has(.detail) {
   padding-bottom: 90px;
   overflow-x: hidden;
   position: relative;
+  -webkit-overflow-scrolling: touch;
 }
 
 .card {
@@ -54,8 +55,11 @@ body:has(.detail) {
   border-radius: 40px 40px 0 0;
   padding: 220px 16px 0;
   padding-bottom: 120px;
-  height: calc(100vh - 100px);
+  min-height: calc(100vh - 100px);
+  max-height: calc(100vh - 100px);
   overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
   z-index: 10;
   box-shadow: 0 10px 40px rgba(28, 55, 106, 0.15);
   display: flex;
