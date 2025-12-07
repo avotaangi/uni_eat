@@ -554,6 +554,25 @@ const encodeImagePath = (path) => {
   return encodedParts.join('/');
 };
 
+// Функция для получения дефолтного изображения (иконка еды на сером фоне)
+const getDefaultFoodImage = () => {
+  const svg = `<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" fill="#e5e7eb"/>
+  <g transform="translate(100, 100)">
+    <circle cx="0" cy="0" r="35" fill="#d1d5db" opacity="0.5"/>
+    <path d="M-20,-12 Q-20,-20 -12,-20 Q-4,-20 -4,-12 Q-4,-4 -12,-4 Q-20,-4 -20,-12 Z" fill="#9ca3af"/>
+    <path d="M4,-12 Q4,-20 12,-20 Q20,-20 20,-12 Q20,-4 12,-4 Q4,-4 4,-12 Z" fill="#9ca3af"/>
+    <path d="M-20,4 Q-20,12 -12,12 Q-4,12 -4,4 Q-4,-4 -12,-4 Q-20,-4 -20,4 Z" fill="#9ca3af"/>
+    <path d="M4,4 Q4,12 12,12 Q20,12 20,4 Q20,-4 12,-4 Q4,-4 4,4 Z" fill="#9ca3af"/>
+    <circle cx="-10" cy="-10" r="2.5" fill="#6b7280"/>
+    <circle cx="10" cy="-10" r="2.5" fill="#6b7280"/>
+    <circle cx="-10" cy="10" r="2.5" fill="#6b7280"/>
+    <circle cx="10" cy="10" r="2.5" fill="#6b7280"/>
+  </g>
+</svg>`;
+  return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+};
+
 const preventHangingPrepositions = (text) => {
   if (!text) return text;
   // Список предлогов, которые не должны оставаться последним словом в строке
@@ -808,7 +827,7 @@ const renderHome = () => {
           (meal) => `
           <div class="meal-card" data-id="${meal.id}">
             <div class="img-wrap">
-              <img src="${encodeImagePath(meal.image)}" alt="${meal.name}">
+              <img src="${encodeImagePath(meal.image)}" alt="${meal.name}" onerror="this.src='${getDefaultFoodImage()}'">
               <div class="fav" data-fav="${meal.id}">${icons.heart(
               state.favorites.has(meal.id)
             )}</div>
@@ -1270,7 +1289,7 @@ const renderDetail = () => {
         <div style="color:#566fa2; font-weight:600; margin-bottom:6px;">${meal.category}</div>
         <div style="font-size:24px; font-weight:700; color:#1c376a; margin-bottom:14px;">${preventHangingPrepositions(meal.name)}</div>
         <div class="detail-image-wrap">
-          <img src="${encodeImagePath(meal.image)}" alt="${meal.name}">
+          <img src="${encodeImagePath(meal.image)}" alt="${meal.name}" onerror="this.src='${getDefaultFoodImage()}'">
         </div>
       </div>
 
@@ -1427,7 +1446,7 @@ const renderCart = () => {
               .map(
                 (item) => `
               <div class="cart-item">
-                <img src="${encodeImagePath(item.meal.image)}" alt="${item.meal.name}">
+                <img src="${encodeImagePath(item.meal.image)}" alt="${item.meal.name}" onerror="this.src='${getDefaultFoodImage()}'">
                 <div>
                   <div class="cart-title">${preventHangingPrepositions(item.meal.name)}</div>
                   ${item.option ? `<div style="color:#6a7ea6;">${item.option}</div>` : ''}
@@ -1645,7 +1664,7 @@ const renderFavorites = () => {
           (meal) => `
           <div class="meal-card" data-id="${meal.id}">
             <div class="img-wrap">
-              <img src="${encodeImagePath(meal.image)}" alt="${meal.name}">
+              <img src="${encodeImagePath(meal.image)}" alt="${meal.name}" onerror="this.src='${getDefaultFoodImage()}'">
               <div class="fav" data-fav="${meal.id}">${icons.heart(
               state.favorites.has(meal.id)
             )}</div>
