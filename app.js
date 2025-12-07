@@ -28,7 +28,7 @@ const meals = [
     category: 'Завтраки',
     price: 110,
     options: ['Сметана', 'Варенье'],
-    image: 'images/блинчики_с_вишней.png',
+    image: 'images/блинчики_с_вишне.png',
   },
   {
     id: 'blini-meat',
@@ -69,7 +69,7 @@ const meals = [
     category: 'Супы',
     price: 60,
     options: [],
-    image: 'images/куриный_суп.png',
+    image: 'images/курины_суп.png',
   },
   // Вторые блюда
   {
@@ -90,7 +90,7 @@ const meals = [
     category: 'Вторые блюда',
     price: 50,
     options: [],
-    image: 'images/картофель_деревенский.png',
+    image: 'images/картофель_деревенски.png',
   },
   {
     id: 'beefsteak',
@@ -140,7 +140,7 @@ const meals = [
     category: 'Вторые блюда',
     price: 50,
     options: [],
-    image: 'images/картофель_жареный.png',
+    image: 'images/картофель_жарены.png',
   },
   {
     id: 'chicken-nuggets',
@@ -541,36 +541,20 @@ const encodeImagePath = (path) => {
   const parts = path.split('/');
   if (parts.length < 2) return path;
   
-  // Кодируем каждую часть пути отдельно, кроме первой (директория)
+  // Кодируем только имя файла (последнюю часть), директорию оставляем как есть
   const encodedParts = parts.map((part, index) => {
-    if (index === 0) {
-      // Первая часть (директория) остается без изменений
-      return part;
+    if (index === parts.length - 1) {
+      // Последняя часть (имя файла) - кодируем для правильной работы с кириллицей
+      return encodeURIComponent(part);
     }
-    // Остальные части кодируем, чтобы правильно обработать кириллицу
-    return encodeURIComponent(part);
+    // Остальные части (директории) оставляем без изменений
+    return part;
   });
   
   return encodedParts.join('/');
 };
 
 // Функция для получения дефолтного изображения (тарелка на сером фоне)
-const getDefaultFoodImage = () => {
-  const svg = `<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
-  <rect width="200" height="200" fill="#e5e7eb"/>
-  <g transform="translate(100, 100)">
-    <!-- Тарелка -->
-    <ellipse cx="0" cy="10" rx="45" ry="8" fill="#d1d5db"/>
-    <ellipse cx="0" cy="0" rx="50" ry="50" fill="#f3f4f6" stroke="#d1d5db" stroke-width="2"/>
-    <ellipse cx="0" cy="0" rx="42" ry="42" fill="none" stroke="#d1d5db" stroke-width="1.5"/>
-    <!-- Вилка и нож -->
-    <path d="M-25,-20 L-25,25 M-25,-15 L-20,-10 L-20,0 L-25,5" stroke="#9ca3af" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-    <path d="M25,-20 L25,25 M25,-15 L30,-10 L30,0 L25,5" stroke="#9ca3af" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  </g>
-</svg>`;
-  return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
-};
-
 const preventHangingPrepositions = (text) => {
   if (!text) return text;
   // Список предлогов, которые не должны оставаться последним словом в строке
@@ -761,14 +745,20 @@ const attachQtyHandlers = (container) => {
 };
 
 const addToCart = (mealId, qty = 1, option = null) => {
+  // Нормализуем опцию: null, 'null' или undefined становятся null
+  const normalizedOption = (option === 'null' || option === null || option === undefined) ? null : option;
+  
   const nextCart = [...state.cart];
   const idx = nextCart.findIndex(
-    (item) => item.mealId === mealId && item.option === option
+    (item) => {
+      const itemOption = (item.option === 'null' || item.option === null || item.option === undefined) ? null : item.option;
+      return item.mealId === mealId && itemOption === normalizedOption;
+    }
   );
   if (idx >= 0) {
     nextCart[idx] = { ...nextCart[idx], qty: nextCart[idx].qty + qty };
   } else {
-    nextCart.push({ mealId, qty, option });
+    nextCart.push({ mealId, qty, option: normalizedOption });
   }
   state.cart = nextCart;
   saveCartToStorage();
@@ -781,10 +771,14 @@ const addToCart = (mealId, qty = 1, option = null) => {
 };
 
 const setCartQty = (mealId, option, qty) => {
+  // Нормализуем опцию: null, 'null' или undefined становятся null
+  const normalizedOption = (option === 'null' || option === null || option === undefined) ? null : option;
+  
   const nextCart = state.cart
-    .map((item) =>
-      item.mealId === mealId && item.option === option ? { ...item, qty } : item
-    )
+    .map((item) => {
+      const itemOption = (item.option === 'null' || item.option === null || item.option === undefined) ? null : item.option;
+      return item.mealId === mealId && itemOption === normalizedOption ? { ...item, qty } : item;
+    })
     .filter((item) => item.qty > 0);
   state.cart = nextCart;
   saveCartToStorage();
@@ -825,7 +819,7 @@ const renderHome = () => {
           (meal) => `
           <div class="meal-card" data-id="${meal.id}">
             <div class="img-wrap">
-              <img src="${encodeImagePath(meal.image)}" alt="${meal.name}" onerror="this.src='${getDefaultFoodImage()}'">
+              <img src="${encodeImagePath(meal.image)}" alt="${meal.name}">
               <div class="fav" data-fav="${meal.id}">${icons.heart(
               state.favorites.has(meal.id)
             )}</div>
@@ -966,7 +960,7 @@ const renderHome = () => {
 
     <div class="search">
       <span class="search-icon">${icons.search}</span>
-      <input type="text" placeholder="Найди свою любимую еду" value="${state.search}" data-search-input>
+      <input type="text" placeholder="Найди свою любимую еду" value="${state.search}" data-search-input autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="text" name="search" data-form-type="other">
       ${state.search ? `<button class="clear-search" data-clear-search title="Очистить">${icons.close}</button>` : ''}
     </div>
 
@@ -1030,38 +1024,130 @@ const renderHome = () => {
     })
   );
 
-  root.querySelectorAll('.meal-card').forEach((card) =>
-    card.addEventListener('click', () => openDetail(card.dataset.id))
-  );
+  // Делегирование событий для карточек блюд
+  root.addEventListener('click', (e) => {
+    const mealCard = e.target.closest('.meal-card');
+    if (mealCard && !e.target.closest('[data-add]') && !e.target.closest('[data-inc]') && !e.target.closest('[data-dec]') && !e.target.closest('[data-fav]')) {
+      openDetail(mealCard.dataset.id);
+    }
+  });
 
-  root.querySelectorAll('[data-add]').forEach((btn) =>
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const meal = meals.find((m) => m.id === btn.dataset.add);
-      addToCart(meal.id, 1, meal.options[0] ?? null);
-      // Обновляем только кнопку добавления без полной перерисовки
-      const mealCard = btn.closest('.meal-card');
-      if (mealCard) {
-        const mealId = meal.id;
-        const option = meal.options[0] ?? null;
-        const cartItem = state.cart.find(item => item.mealId === mealId && (item.option === option));
-        if (cartItem) {
-          btn.outerHTML = `
-            <div class="qty-controls" data-meal-id="${mealId}" data-option="${option}">
-              <button class="qty-btn" data-dec="${mealId}" data-opt="${option}">${icons.minus}</button>
-              <span class="qty-value">${cartItem.qty}</span>
-              <button class="qty-btn" data-inc="${mealId}" data-opt="${option}">${icons.plus}</button>
-            </div>
-          `;
-          // Добавляем обработчики для новых кнопок
-          attachQtyHandlers(mealCard);
+  // Делегирование событий для кнопок добавления, увеличения и уменьшения количества
+  if (!root.dataset.cartHandlersAttached) {
+    root.dataset.cartHandlersAttached = 'true';
+    
+    // Обработчик для кнопки добавления
+    root.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-add]');
+      if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const meal = meals.find((m) => m.id === btn.dataset.add);
+        if (meal) {
+          addToCart(meal.id, 1, meal.options[0] ?? null);
+          // Обновляем только кнопку добавления без полной перерисовки
+          const mealCard = btn.closest('.meal-card');
+          if (mealCard) {
+            const mealId = meal.id;
+            const option = meal.options[0] ?? null;
+            const cartItem = state.cart.find(item => item.mealId === mealId && (item.option === option));
+            if (cartItem) {
+              btn.outerHTML = `
+                <div class="qty-controls" data-meal-id="${mealId}" data-option="${option}">
+                  <button class="qty-btn" data-dec="${mealId}" data-opt="${option}">${icons.minus}</button>
+                  <span class="qty-value">${cartItem.qty}</span>
+                  <button class="qty-btn" data-inc="${mealId}" data-opt="${option}">${icons.plus}</button>
+                </div>
+              `;
+            }
+          }
         }
       }
-    })
-  );
+    });
 
-  // Обработчики для кнопок управления количеством
-  attachQtyHandlers(root);
+    // Обработчик для кнопки увеличения количества
+    root.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-inc]');
+      if (btn && (state.view === 'home' || state.view === 'favorites')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const mealId = btn.dataset.inc;
+        const option = btn.dataset.opt === '' ? null : btn.dataset.opt;
+        const cartItem = state.cart.find(item => item.mealId === mealId && (item.option === option));
+        if (cartItem) {
+          const newQty = cartItem.qty + 1;
+          setCartQty(mealId, option, newQty);
+          // Обновляем только элемент управления количеством
+          const qtyControls = btn.closest('.qty-controls');
+          if (qtyControls) {
+            const updatedItem = state.cart.find(item => item.mealId === mealId && (item.option === option));
+            if (updatedItem) {
+              const qtyValue = qtyControls.querySelector('.qty-value');
+              if (qtyValue) {
+                qtyValue.textContent = updatedItem.qty;
+              }
+            }
+          }
+        } else {
+          // Если элемента нет в корзине, добавляем его
+          const meal = meals.find(m => m.id === mealId);
+          if (meal) {
+            addToCart(mealId, 1, option);
+            // Обновляем кнопку на qty-controls
+            const mealCard = btn.closest('.meal-card');
+            if (mealCard) {
+              const addBtn = mealCard.querySelector('[data-add]');
+              if (addBtn) {
+                const cartItem = state.cart.find(item => item.mealId === mealId && (item.option === option));
+                if (cartItem) {
+                  addBtn.outerHTML = `
+                    <div class="qty-controls" data-meal-id="${mealId}" data-option="${option}">
+                      <button class="qty-btn" data-dec="${mealId}" data-opt="${option}">${icons.minus}</button>
+                      <span class="qty-value">${cartItem.qty}</span>
+                      <button class="qty-btn" data-inc="${mealId}" data-opt="${option}">${icons.plus}</button>
+                    </div>
+                  `;
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Обработчик для кнопки уменьшения количества
+    root.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-dec]');
+      if (btn && (state.view === 'home' || state.view === 'favorites')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const mealId = btn.dataset.dec;
+        const option = btn.dataset.opt === '' ? null : btn.dataset.opt;
+        const cartItem = state.cart.find(item => item.mealId === mealId && (item.option === option));
+        if (cartItem && cartItem.qty > 0) {
+          const newQty = cartItem.qty - 1;
+          setCartQty(mealId, option, newQty);
+          // Обновляем только элемент управления количеством
+          const qtyControls = btn.closest('.qty-controls');
+          if (qtyControls) {
+            const updatedItem = state.cart.find(item => item.mealId === mealId && (item.option === option));
+            if (updatedItem && updatedItem.qty > 0) {
+              const qtyValue = qtyControls.querySelector('.qty-value');
+              if (qtyValue) {
+                qtyValue.textContent = updatedItem.qty;
+              }
+            } else {
+              // Удаляем из корзины и возвращаем кнопку добавления
+              const meal = meals.find(m => m.id === mealId);
+              if (meal && qtyControls) {
+                qtyControls.outerHTML = `<button class="add-btn" data-add="${mealId}">${icons.plus}</button>`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
 
   root.querySelectorAll('[data-fav]').forEach((btn) =>
     btn.addEventListener('click', (e) => {
@@ -1123,17 +1209,27 @@ const renderHome = () => {
       const currentSelectionEnd = searchInput.selectionEnd;
       
       searchTimeout = setTimeout(() => {
+        // Сохраняем фокус перед обновлением
+        const hadFocus = document.activeElement === searchInput;
+        
         // Используем setState, который правильно восстанавливает фокус
         setState({ search: value });
         
-        // Дополнительно восстанавливаем позицию курсора после обновления
+        // Дополнительно восстанавливаем позицию курсора и фокус после обновления
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             const input = root.querySelector('[data-search-input]');
-            if (input && document.activeElement === input) {
-              const newStart = Math.min(currentSelectionStart, value.length);
-              const newEnd = Math.min(currentSelectionEnd, value.length);
-              input.setSelectionRange(newStart, newEnd);
+            if (input) {
+              // Восстанавливаем фокус, если он был до обновления
+              if (hadFocus && document.activeElement !== input) {
+                input.focus();
+              }
+              // Восстанавливаем позицию курсора
+              if (document.activeElement === input) {
+                const newStart = Math.min(currentSelectionStart, value.length);
+                const newEnd = Math.min(currentSelectionEnd, value.length);
+                input.setSelectionRange(newStart, newEnd);
+              }
             }
           });
         });
@@ -1153,9 +1249,8 @@ const renderHome = () => {
     searchInput.addEventListener('click', (e) => {
       e.stopPropagation();
     });
-    searchInput.addEventListener('blur', (e) => {
-      // Не предотвращаем blur, чтобы пользователь мог сам закрыть клавиатуру
-    });
+    // Не добавляем обработчик blur, чтобы клавиатура не скрывалась автоматически
+    // при обновлении результатов поиска, но пользователь мог закрыть её вручную
   }
 
   root.querySelector('[data-clear-search]')?.addEventListener('click', (e) => {
@@ -1368,7 +1463,7 @@ const renderDetail = () => {
         <div style="color:#566fa2; font-weight:600; margin-bottom:6px;">${meal.category}</div>
         <div style="font-size:24px; font-weight:700; color:#1c376a; margin-bottom:14px;">${preventHangingPrepositions(meal.name)}</div>
         <div class="detail-image-wrap">
-          <img src="${encodeImagePath(meal.image)}" alt="${meal.name}" onerror="this.src='${getDefaultFoodImage()}'">
+          <img src="${encodeImagePath(meal.image)}" alt="${meal.name}">
         </div>
       </div>
 
@@ -1502,10 +1597,31 @@ const renderDetail = () => {
 };
 
 const renderCart = () => {
-  const items = state.cart.map((item) => {
+  // Фильтруем дубликаты и нормализуем опции
+  const normalizedCart = state.cart.map((item) => ({
+    ...item,
+    option: item.option === 'null' || item.option === null ? null : item.option
+  }));
+  
+  // Группируем элементы по mealId и option, объединяя количества
+  const groupedCart = normalizedCart.reduce((acc, item) => {
+    const key = `${item.mealId}_${item.option ?? 'null'}`;
+    const existing = acc.find(i => 
+      i.mealId === item.mealId && 
+      (i.option === item.option || (i.option === null && item.option === null))
+    );
+    if (existing) {
+      existing.qty += item.qty;
+    } else {
+      acc.push({ ...item });
+    }
+    return acc;
+  }, []);
+  
+  const items = groupedCart.map((item) => {
     const meal = meals.find((m) => m.id === item.mealId);
     return { ...item, meal };
-  });
+  }).filter(item => item.meal); // Убираем элементы без meal
   const total = items.reduce((sum, item) => sum + item.meal.price * item.qty, 0);
 
   root.innerHTML = `
@@ -1525,10 +1641,10 @@ const renderCart = () => {
               .map(
                 (item) => `
               <div class="cart-item">
-                <img src="${encodeImagePath(item.meal.image)}" alt="${item.meal.name}" onerror="this.src='${getDefaultFoodImage()}'">
+                <img src="${encodeImagePath(item.meal.image)}" alt="${item.meal.name}">
                 <div>
                   <div class="cart-title">${preventHangingPrepositions(item.meal.name)}</div>
-                  ${item.option ? `<div style="color:#6a7ea6;">${item.option}</div>` : ''}
+                  ${item.option && item.option !== 'null' && item.option !== null ? `<div style="color:#6a7ea6;">${item.option}</div>` : ''}
                   <div class="qty" style="margin-top:8px;">
                     <button data-dec="${item.meal.id}" data-opt="${item.option ?? ''}">${icons.minus}</button>
                     <span class="qty-value">${item.qty}</span>
@@ -1743,7 +1859,7 @@ const renderFavorites = () => {
           (meal) => `
           <div class="meal-card" data-id="${meal.id}">
             <div class="img-wrap">
-              <img src="${encodeImagePath(meal.image)}" alt="${meal.name}" onerror="this.src='${getDefaultFoodImage()}'">
+              <img src="${encodeImagePath(meal.image)}" alt="${meal.name}">
               <div class="fav" data-fav="${meal.id}">${icons.heart(
               state.favorites.has(meal.id)
             )}</div>
@@ -1870,7 +1986,7 @@ const renderBooking = () => {
                 <label style="display:block; font-weight:600; color:#1c376a; margin-bottom:8px; font-size:14px;">Время посещения</label>
                 <div style="display:flex; align-items:center; gap:12px; width:100%;">
                   <input type="time" id="bookingTime" name="time" required style="flex:1; min-width:0; padding:12px; border:1.5px solid #dce5f7; border-radius:12px; font-size:16px; color:#1c376a; background:#fff; box-sizing:border-box;" value="${savedBookingData?.time || ''}">
-                  <span style="font-size:12px; color:#6a7ea6; white-space:nowrap; flex-shrink:0;">± 10 минут</span>
+                  <span style="font-size:12px; color:#6a7ea6; white-space:nowrap; flex-shrink:0;">мин. +15 мин</span>
                 </div>
               </div>
             </div>
@@ -1942,42 +2058,10 @@ const renderBooking = () => {
     </div>
   `;
 
-  // Функция для обновления минимального времени в зависимости от выбранной даты
-  const updateTimeMin = () => {
-    const dateInput = root.querySelector('#bookingDate');
-    const timeInput = root.querySelector('#bookingTime');
-    if (!dateInput || !timeInput) return;
-    
-    const selectedDate = dateInput.value;
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    
-    if (selectedDate === todayStr) {
-      // Если выбрана сегодняшняя дата, минимальное время - текущее время + 10 минут
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes() + 10).padStart(2, '0');
-      const minTime = `${hours}:${minutes}`;
-      timeInput.setAttribute('min', minTime);
-      
-      // Если текущее время больше выбранного, сбрасываем время
-      if (timeInput.value && timeInput.value < minTime) {
-        timeInput.value = '';
-      }
-    } else {
-      // Если выбрана будущая дата, минимальное время не ограничено
-      timeInput.removeAttribute('min');
-    }
-  };
-
   // Устанавливаем сегодняшнюю дату по умолчанию
   const dateInput = root.querySelector('#bookingDate');
   if (dateInput) {
     dateInput.value = today;
-    // Обновляем минимальное время при изменении даты
-    dateInput.addEventListener('change', updateTimeMin);
-    dateInput.addEventListener('input', updateTimeMin);
-    // Инициализируем минимальное время
-    updateTimeMin();
   }
 
 
@@ -2035,13 +2119,6 @@ const renderBooking = () => {
         }, 0);
       }
       
-      // Проверяем валидность времени при вводе
-      updateTimeMin();
-    });
-    
-    // Проверяем валидность времени при изменении
-    timeInput.addEventListener('change', () => {
-      updateTimeMin();
     });
   }
 
@@ -2059,14 +2136,14 @@ const renderBooking = () => {
     
     // Проверяем, что все поля заполнены
     if (name && email && phone && date && time && guests) {
-      // Проверяем, что дата и время не в прошлом
+      // Проверяем, что дата и время не в прошлом и минимум +15 минут от текущего времени
       const selectedDateTime = new Date(`${date}T${time}`);
       const now = new Date();
-      // Добавляем 10 минут к текущему времени для учета погрешности
-      const minDateTime = new Date(now.getTime() + 10 * 60 * 1000);
+      // Добавляем 15 минут к текущему времени
+      const minDateTime = new Date(now.getTime() + 15 * 60 * 1000);
       
       if (selectedDateTime < minDateTime) {
-        alert('Нельзя выбрать прошедшую дату и время. Пожалуйста, выберите будущую дату и время.');
+        alert('Время посещения должно быть минимум на 15 минут позже текущего времени. Пожалуйста, выберите другое время.');
         return;
       }
       // Сохраняем данные бронирования в localStorage (кроме даты для автозаполнения, но сохраняем для QR-кода)
